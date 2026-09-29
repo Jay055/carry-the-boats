@@ -549,6 +549,7 @@ export default function Home() {
                       <summary>Technique + alternatives</summary>
                       <p><strong>Technique cue:</strong> {exercise.cue}</p>
                       <p><strong>Alternatives:</strong> {exercise.alternatives.join(" · ")}</p>
+                      <p><strong>Why these swaps:</strong> they preserve the same main target while changing the setup, equipment, balance demand, or joint loading. Use the first available option that feels controlled and pain-free.</p>
                       <p><strong>Equipment:</strong> {exercise.equipment.join(" · ")}</p>
                     </details>
                   </article>
