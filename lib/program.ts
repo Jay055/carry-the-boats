@@ -28,6 +28,7 @@ export type Exercise = {
   equipment: Equipment[];
   alternatives: string[];
   demoUrl: string;
+  videoUrl?: string;
   loadStep: number;
   priority?: boolean;
 };
@@ -91,6 +92,7 @@ export const sessions: Session[] = [
         equipment: ["Dumbbells", "Bench", "Incline press machine"],
         alternatives: ["Incline machine press", "Low-incline dumbbell press", "Cable press"],
         demoUrl: mw("dumbbell-incline-bench-press"),
+        videoUrl: "https://www.youtube.com/embed/YzA3rsX3znQ",
         loadStep: 2.5
       },
       {
@@ -127,6 +129,7 @@ export const sessions: Session[] = [
         equipment: ["Cable station"],
         alternatives: ["Lateral-raise machine", "Dumbbell lateral raise"],
         demoUrl: mw("cable-low-single-arm-lateral-raise"),
+        videoUrl: "https://www.youtube.com/embed/zR9xDUfHSqw",
         loadStep: 1.25, priority: true
       },
       {
@@ -172,6 +175,7 @@ export const sessions: Session[] = [
         equipment: ["Leg press"],
         alternatives: ["Hack squat machine if comfortable", "Belt squat", "Supported split squat"],
         demoUrl: mw("machine-leg-press"),
+        videoUrl: "https://www.youtube.com/embed/RaI6ofF2geQ",
         loadStep: 5, priority: true
       },
       {
@@ -253,6 +257,7 @@ export const sessions: Session[] = [
         equipment: ["Incline press machine"],
         alternatives: ["Low-incline dumbbell press", "Cable press"],
         demoUrl: mw("dumbbell-incline-bench-press"),
+        videoUrl: "https://www.youtube.com/embed/YzA3rsX3znQ",
         loadStep: 2.5
       },
       {
@@ -277,6 +282,7 @@ export const sessions: Session[] = [
         equipment: ["Cable station"],
         alternatives: ["Lateral-raise machine", "Dumbbell lateral raise"],
         demoUrl: mw("cable-low-single-arm-lateral-raise"),
+        videoUrl: "https://www.youtube.com/embed/zR9xDUfHSqw",
         loadStep: 1.25, priority: true
       },
       {
@@ -370,6 +376,7 @@ export const sessions: Session[] = [
         equipment: ["Leg press"],
         alternatives: ["Belt squat", "Supported split squat"],
         demoUrl: mw("machine-leg-press"),
+        videoUrl: "https://www.youtube.com/embed/RaI6ofF2geQ",
         loadStep: 5
       },
       {
