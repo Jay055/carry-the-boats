@@ -149,10 +149,35 @@ function equipmentMatch(exercise: Exercise, available: Equipment[]) {
   return exercise.equipment.some((item) => available.includes(item));
 }
 
-function youtubeId(url?: string) {
-  if (!url) return null;
-  const match = url.match(/embed\/([^?&/]+)/);
-  return match?.[1] || null;
+type MotionKind =
+  | "press"
+  | "pulldown"
+  | "row"
+  | "lateral"
+  | "reverse-fly"
+  | "shrug"
+  | "leg-press"
+  | "leg-curl"
+  | "hip-thrust"
+  | "leg-extension"
+  | "calf"
+  | "curl"
+  | "pushdown";
+
+function motionKind(exercise: Exercise): MotionKind {
+  if (exercise.id === "press" || exercise.id === "incline" || exercise.id === "inclineC") return "press";
+  if (exercise.id === "pulldown" || exercise.id === "singlelat") return "pulldown";
+  if (exercise.id === "row" || exercise.id === "rowC") return "row";
+  if (exercise.id === "cable-lateral-raise") return "lateral";
+  if (exercise.id === "reverse-pec-deck") return "reverse-fly";
+  if (exercise.id === "shrug") return "shrug";
+  if (exercise.id === "leg-press") return "leg-press";
+  if (exercise.id === "seated-leg-curl") return "leg-curl";
+  if (exercise.id === "hip") return "hip-thrust";
+  if (exercise.id === "leg-extension") return "leg-extension";
+  if (exercise.id === "calf") return "calf";
+  if (exercise.id === "biceps") return "curl";
+  return "pushdown";
 }
 
 function Button(props: ButtonHTMLAttributes<HTMLButtonElement>) {
@@ -164,26 +189,64 @@ function Button(props: ButtonHTMLAttributes<HTMLButtonElement>) {
   );
 }
 
-function ExerciseThumb({ exercise, size = "normal" }: { exercise: Exercise; size?: "small" | "normal" | "large" }) {
-  const id = youtubeId(exercise.videoUrl);
-  const initials = exercise.target
-    .split(/[+&/]/)
-    .map((part) => part.trim()[0])
-    .filter(Boolean)
-    .slice(0, 2)
-    .join("");
+function ExerciseAnimation({
+  exercise,
+  size = "normal",
+  paused = false
+}: {
+  exercise: Exercise;
+  size?: "small" | "normal" | "large";
+  paused?: boolean;
+}) {
+  const kind = motionKind(exercise);
   return (
-    <div className={"exercise-thumb " + size}>
-      {id ? (
-        <img src={"https://i.ytimg.com/vi/" + id + "/hqdefault.jpg"} alt="" />
-      ) : (
-        <div className="exercise-fallback">
-          <span>{initials || "EX"}</span>
-          <i />
-        </div>
-      )}
+    <div
+      className={"exercise-motion " + size + " motion-" + kind + (paused ? " paused" : "")}
+      role="img"
+      aria-label={"Animated demonstration of " + exercise.name}
+    >
+      <svg viewBox="0 0 120 100" aria-hidden="true">
+        <line className="motion-ground" x1="12" y1="87" x2="108" y2="87" />
+        <g className="motion-person">
+          <circle className="motion-head" cx="60" cy="24" r="7" />
+          <line className="motion-torso" x1="60" y1="31" x2="60" y2="60" />
+          <g className="motion-arms">
+            <line className="motion-arm left" x1="60" y1="37" x2="44" y2="51" />
+            <line className="motion-arm right" x1="60" y1="37" x2="76" y2="51" />
+            <circle className="motion-weight weight-left" cx="43" cy="52" r="3" />
+            <circle className="motion-weight weight-right" cx="77" cy="52" r="3" />
+          </g>
+          <g className="motion-forearms">
+            <line className="motion-forearm left" x1="44" y1="51" x2="45" y2="66" />
+            <line className="motion-forearm right" x1="76" y1="51" x2="75" y2="66" />
+          </g>
+          <g className="motion-legs">
+            <line className="motion-thigh left" x1="60" y1="60" x2="48" y2="74" />
+            <line className="motion-thigh right" x1="60" y1="60" x2="72" y2="74" />
+            <g className="motion-lower-legs">
+              <line className="motion-shin left" x1="48" y1="74" x2="47" y2="87" />
+              <line className="motion-shin right" x1="72" y1="74" x2="73" y2="87" />
+            </g>
+          </g>
+        </g>
+
+        <g className="motion-equipment">
+          <line className="cable-post" x1="98" y1="12" x2="98" y2="86" />
+          <line className="cable-line" x1="98" y1="20" x2="78" y2="44" />
+          <rect className="bench-shape" x="35" y="66" width="50" height="8" rx="3" />
+          <rect className="sled-shape" x="82" y="45" width="20" height="32" rx="4" />
+          <line className="machine-pad" x1="82" y1="62" x2="101" y2="62" />
+        </g>
+
+        <path className="motion-arrow arrow-up" d="M103 69 L103 38 M98 43 L103 38 L108 43" />
+        <path className="motion-arrow arrow-out" d="M60 70 L88 70 M83 65 L88 70 L83 75" />
+      </svg>
     </div>
   );
+}
+
+function ExerciseThumb({ exercise, size = "normal" }: { exercise: Exercise; size?: "small" | "normal" | "large" }) {
+  return <ExerciseAnimation exercise={exercise} size={size} />;
 }
 
 function NavIcon({ type }: { type: Tab }) {
@@ -447,8 +510,7 @@ export default function Home() {
   }
 
   function openDemo(exercise: Exercise) {
-    if (exercise.videoUrl) setDemoExercise(exercise);
-    else window.open(exercise.demoUrl, "_blank", "noopener,noreferrer");
+    setDemoExercise(exercise);
   }
 
   if (!ready) {
@@ -645,451 +707,9 @@ export default function Home() {
                 </div>
                 <button onClick={() => setDemoExercise(null)}>✕</button>
               </div>
-              {demoExercise.videoUrl ? (
-                <div className="video-frame">
-                  <iframe
-                    src={demoExercise.videoUrl}
-                    title={demoExercise.name + " exercise demonstration"}
-                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-                    allowFullScreen
-                  />
-                </div>
-              ) : null}
-              <p className="demo-cue">{demoExercise.cue}</p>
-              <a className="guide-link" href={demoExercise.demoUrl} target="_blank" rel="noreferrer">
-                Open animated exercise guide ↗
-              </a>
-            </div>
-          </div>
-        ) : null}
-      </main>
-    );
-  }
-
-  return (
-    <main className="hevy-app">
-      <header className="app-topbar">
-        <div>
-          <span className="app-kicker">CARRY THE BOATS</span>
-          <h1>{tab === "workout" ? "Workout" : tab === "history" ? "History" : tab === "progress" ? "Progress" : "Program"}</h1>
-        </div>
-        <div className="profile-dot">UN</div>
-      </header>
-
-      <div className="app-content">
-        {tab === "workout" ? (
-          <section className="tab-page workout-page">
-            <div className="week-card">
-              <div>
-                <span>This week</span>
-                <strong>{requiredThisWeek} of 3 core workouts</strong>
-              </div>
-              <div className="week-dots">
-                {[0, 1, 2].map((index) => (
-                  <i className={index < requiredThisWeek ? "filled" : ""} key={index}>
-                    {index < requiredThisWeek ? "✓" : index + 1}
-                  </i>
-                ))}
-                <i className={completedThisWeek.some((workout) => workout.sessionId === "D") ? "bonus filled" : "bonus"}>D</i>
-              </div>
-            </div>
-
-            <article className="next-routine-card">
-              <div className="next-label">RECOMMENDED NEXT</div>
-              <div className="next-routine-main">
-                <div>
-                  <span className="routine-letter">{chosenSession.id}</span>
-                  <h2>{chosenSession.title}</h2>
-                  <p>{chosenSession.duration} · {chosenSession.exercises.length} exercises</p>
-                </div>
-                <Button className="blue-button" onClick={() => startWorkout(chosenSession)}>Start routine</Button>
-              </div>
-              <div className="mini-exercise-row">
-                {chosenSession.exercises.slice(0, 4).map((exercise) => (
-                  <button key={exercise.id} onClick={() => openDemo(exercise)}>
-                    <ExerciseThumb exercise={exercise} size="small" />
-                    <span>{exercise.name}</span>
-                  </button>
-                ))}
-              </div>
-            </article>
-
-            <div className="section-title-row">
-              <div>
-                <h2>My routines</h2>
-                <span>Science-built for your goals</span>
-              </div>
-              <span className="routine-count">{sessions.length}</span>
-            </div>
-
-            <div className="routine-list">
-              {sessions.map((session) => (
-                <article className="routine-card" key={session.id}>
-                  <button className="routine-card-main" onClick={() => setPreviewSessionId(session.id)}>
-                    <div className="routine-card-head">
-                      <div>
-                        <span className={session.required ? "routine-letter" : "routine-letter optional"}>{session.id}</span>
-                        <div>
-                          <h3>{session.title}</h3>
-                          <p>{session.required ? "Core routine" : "Optional"} · {session.duration}</p>
-                        </div>
-                      </div>
-                      <span className="chevron">›</span>
-                    </div>
-                    <div className="routine-preview-list">
-                      {session.exercises.slice(0, 4).map((exercise) => (
-                        <div className="routine-preview-exercise" key={exercise.id}>
-                          <ExerciseThumb exercise={exercise} size="small" />
-                          <div>
-                            <strong>{exercise.name}</strong>
-                            <span>{exercise.sets} sets · {exercise.reps}</span>
-                          </div>
-                        </div>
-                      ))}
-                      {session.exercises.length > 4 ? (
-                        <span className="more-exercises">+{session.exercises.length - 4} more exercises</span>
-                      ) : null}
-                    </div>
-                  </button>
-                  <Button className="routine-start" onClick={() => startWorkout(session)}>Start routine</Button>
-                </article>
-              ))}
-            </div>
-
-            <div className="hevy-reference-note">
-              <strong>Built for gym speed</strong>
-              <span>Routines are reusable templates. Starting one turns it into a live workout where you log each set, just like the workflow popularized by Hevy.</span>
-            </div>
-          </section>
-        ) : null}
-
-        {tab === "history" ? (
-          <section className="tab-page">
-            <div className="calendar-strip">
-              {dayStrip.map((day) => {
-                const entries = workoutsByDate[day.date] || [];
-                return (
-                  <div className={day.date === isoDate() ? "cal-day today" : "cal-day"} key={day.date}>
-                    <span>{day.weekday}</span>
-                    <strong>{day.day}</strong>
-                    <div>{entries.map((entry, index) => <i key={entry + index}>{entry}</i>)}</div>
-                  </div>
-                );
-              })}
-            </div>
-
-            <div className="section-title-row history-title">
-              <div>
-                <h2>Recent workouts</h2>
-                <span>{store.workouts.length} logged sessions</span>
-              </div>
-            </div>
-
-            <div className="history-list">
-              {[...store.workouts].reverse().map((workout) => {
-                const session = sessions.find((item) => item.id === workout.sessionId) || sessions[0];
-                return (
-                  <article className="history-card" key={workout.id}>
-                    <div className="history-head">
-                      <div className="routine-letter">{workout.sessionId}</div>
-                      <div>
-                        <h3>{session.title}</h3>
-                        <p>{new Date(workout.date + "T12:00:00").toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "short" })}</p>
-                      </div>
-                      <button onClick={() => deleteWorkout(workout.id)}>•••</button>
-                    </div>
-                    <div className="history-stats">
-                      <div><span>Duration</span><strong>{workout.durationMin ? workout.durationMin + " min" : "—"}</strong></div>
-                      <div><span>Volume</span><strong>{workoutVolume(workout).toLocaleString()} kg</strong></div>
-                      <div><span>Sets</span><strong>{completedSetCount(workout)}</strong></div>
-                    </div>
-                    <div className="history-exercises">
-                      {session.exercises.slice(0, 4).map((exercise) => {
-                        const done = (workout.sets[exercise.id] || []).filter((set) => set.done);
-                        const best = done.reduce<{ weight: number; reps: number } | null>((result, set) => {
-                          const weight = Number(set.weight) || 0;
-                          const reps = Number(set.reps) || 0;
-                          if (!result || weight > result.weight) return { weight, reps };
-                          return result;
-                        }, null);
-                        return (
-                          <div key={exercise.id}>
-                            <ExerciseThumb exercise={exercise} size="small" />
-                            <span>{exercise.name}</span>
-                            <strong>{best && best.weight > 0 ? best.weight + " kg × " + best.reps : done.length + " sets"}</strong>
-                          </div>
-                        );
-                      })}
-                    </div>
-                    <Button className="repeat-button" onClick={() => startWorkout(session)}>Repeat workout</Button>
-                  </article>
-                );
-              })}
-              {!store.workouts.length ? (
-                <div className="empty-state">
-                  <div className="empty-icon">✓</div>
-                  <h3>No workouts yet</h3>
-                  <p>Start Session {selected}. Your full workout will appear here after you finish.</p>
-                  <Button className="blue-button" onClick={() => startWorkout(chosenSession)}>Start Session {selected}</Button>
-                </div>
-              ) : null}
-            </div>
-          </section>
-        ) : null}
-
-        {tab === "progress" ? (
-          <section className="tab-page">
-            <div className="progress-overview">
-              <div><span>This week</span><strong>{completedThisWeek.length}</strong><small>workouts</small></div>
-              <div><span>Bodyweight</span><strong>{latestBody ? latestBody.weight : "—"}</strong><small>{latestBody ? "kg" : "not logged"}</small></div>
-              <div><span>Total sessions</span><strong>{store.workouts.length}</strong><small>all time</small></div>
-            </div>
-
-            <div className="section-title-row">
-              <div>
-                <h2>Exercise progress</h2>
-                <span>Best logged load by session</span>
-              </div>
-            </div>
-
-            <div className="progress-card-grid">
-              {progressSeries.map((series) => {
-                const latest = series.values.at(-1);
-                return (
-                  <article className="progress-card" key={series.exerciseId}>
-                    <div className="progress-card-head">
-                      <div>
-                        <span>{series.label}</span>
-                        <strong>{latest ? latest + " kg" : "No data yet"}</strong>
-                      </div>
-                      <span className="chart-period">LAST 8</span>
-                    </div>
-                    <MiniChart values={series.values} />
-                  </article>
-                );
-              })}
-            </div>
-
-            <article className="body-card">
-              <div className="section-title-row compact">
-                <div>
-                  <h2>Body measurements</h2>
-                  <span>Track the trend, not one day</span>
-                </div>
-              </div>
-              <div className="body-inputs">
-                <label>
-                  Weight (kg)
-                  <input value={bodyWeight} inputMode="decimal" onChange={(event) => setBodyWeight(event.target.value)} placeholder="100.0" />
-                </label>
-                <label>
-                  Waist (cm)
-                  <input value={waist} inputMode="decimal" onChange={(event) => setWaist(event.target.value)} placeholder="optional" />
-                </label>
-                <Button className="blue-button" onClick={saveBody}>Log measurement</Button>
-              </div>
-              <div className="measurement-history">
-                {[...store.body].reverse().slice(0, 8).map((entry) => (
-                  <div key={entry.date + entry.weight}>
-                    <span>{entry.date}</span>
-                    <strong>{entry.weight} kg</strong>
-                    <small>{entry.waist ? entry.waist + " cm waist" : ""}</small>
-                  </div>
-                ))}
-              </div>
-            </article>
-
-            <article className="volume-card">
-              <div className="section-title-row compact">
-                <div>
-                  <h2>Program volume</h2>
-                  <span>Baseline direct sets</span>
-                </div>
-              </div>
-              <div className="volume-bars">
-                {weeklyDirectSets.map(([muscle, sets]) => {
-                  const baseline = Number(sets.match(/\d+/)?.[0] || 0);
-                  return (
-                    <div key={muscle}>
-                      <div><span>{muscle}</span><strong>{sets}</strong></div>
-                      <i><b style={{ width: Math.min(100, baseline * 8) + "%" }} /></i>
-                    </div>
-                  );
-                })}
-              </div>
-            </article>
-          </section>
-        ) : null}
-
-        {tab === "program" ? (
-          <section className="tab-page">
-            <article className="program-intro">
-              <span className="app-kicker">YOUR PROGRAM</span>
-              <h2>Built to grow muscle without wasting recovery.</h2>
-              <p>Stable movements, enough hard weekly sets, measurable progression, and joint-aware substitutions. The science supports the system; the workout screen keeps it simple.</p>
-            </article>
-
-            <div className="section-title-row">
-              <div>
-                <h2>Exercise demos</h2>
-                <span>Tap any movement before you train it</span>
-              </div>
-            </div>
-            <div className="demo-library">
-              {uniqueExercises.slice(0, 12).map((exercise) => (
-                <button key={exercise.id} onClick={() => openDemo(exercise)}>
-                  <ExerciseThumb exercise={exercise} size="large" />
-                  <strong>{exercise.name}</strong>
-                  <span>{exercise.target}</span>
-                  <i>{exercise.videoUrl ? "▶ Video" : "↗ Animated guide"}</i>
-                </button>
-              ))}
-            </div>
-
-            <article className="program-panel">
-              <h3>Example week around boxing</h3>
-              <div className="weekly-schedule">
-                {exampleWeek.map(([day, work]) => (
-                  <div key={day}><strong>{day}</strong><span>{work}</span></div>
-                ))}
-              </div>
-            </article>
-
-            <article className="program-panel">
-              <h3>Why the program works</h3>
-              <div className="principles-list">
-                {principles.map(([title, text]) => (
-                  <div key={title}><strong>{title}</strong><p>{text}</p></div>
-                ))}
-              </div>
-            </article>
-
-            <article className="program-panel">
-              <h3>Your gym equipment</h3>
-              <p className="panel-copy">Select what is actually available. Missing equipment gets flagged during the workout with targeted alternatives.</p>
-              <div className="equipment-grid">
-                {allEquipment.map((item) => {
-                  const checked = store.equipment.includes(item);
-                  return (
-                    <button className={checked ? "equipment-pill selected" : "equipment-pill"} key={item} onClick={() => toggleEquipment(item)}>
-                      <span>{checked ? "✓" : "+"}</span>{item}
-                    </button>
-                  );
-                })}
-              </div>
-            </article>
-
-            <article className="program-panel">
-              <h3>Food that fits real life</h3>
-              <div className="meal-list">
-                {mealIdeas.map((meal) => <div key={meal}>{meal}</div>)}
-              </div>
-              <p className="panel-copy">Protein is the anchor. Egusi, rice, stew and Nigerian meals stay in the plan; portions and protein density matter more than eating “fitness foods.”</p>
-            </article>
-
-            <article className="program-panel">
-              <h3>Evidence</h3>
-              <div className="evidence-list">
-                {science.map((item) => (
-                  <a href={item.url} target="_blank" rel="noreferrer" key={item.title}>
-                    <div><strong>{item.title}</strong><p>{item.text}</p></div><span>↗</span>
-                  </a>
-                ))}
-              </div>
-            </article>
-
-            <article className="program-panel data-panel">
-              <h3>Data backup</h3>
-              <p className="panel-copy">Your workout log is stored in this browser for instant use. A secured Supabase backend is prepared for cross-device sync once the final production authentication redirect is configured.</p>
-              <Button
-                className="secondary-button"
-                onClick={() => {
-                  const blob = new Blob([JSON.stringify(store, null, 2)], { type: "application/json" });
-                  const url = URL.createObjectURL(blob);
-                  const anchor = document.createElement("a");
-                  anchor.href = url;
-                  anchor.download = "carry-the-boats-" + isoDate() + ".json";
-                  anchor.click();
-                  URL.revokeObjectURL(url);
-                }}
-              >
-                Export workout data
-              </Button>
-            </article>
-          </section>
-        ) : null}
-      </div>
-
-      <nav className="bottom-nav" aria-label="Primary navigation">
-        {([
-          ["workout", "Workout"],
-          ["history", "History"],
-          ["progress", "Progress"],
-          ["program", "Program"]
-        ] as [Tab, string][]).map(([id, label]) => (
-          <button className={tab === id ? "active" : ""} onClick={() => setTab(id)} key={id}>
-            <NavIcon type={id} />
-            <span>{label}</span>
-          </button>
-        ))}
-      </nav>
-
-      {previewSession ? (
-        <div className="modal-backdrop routine-backdrop" onClick={() => setPreviewSessionId(null)}>
-          <div className="routine-sheet" onClick={(event) => event.stopPropagation()}>
-            <div className="sheet-handle" />
-            <div className="routine-sheet-head">
-              <div>
-                <span className={previewSession.required ? "routine-letter" : "routine-letter optional"}>{previewSession.id}</span>
-                <div>
-                  <h2>{previewSession.title}</h2>
-                  <p>{previewSession.duration} · {previewSession.exercises.length} exercises</p>
-                </div>
-              </div>
-              <button onClick={() => setPreviewSessionId(null)}>✕</button>
-            </div>
-            <p className="sheet-subtitle">{previewSession.subtitle}</p>
-            <div className="sheet-exercises">
-              {previewSession.exercises.map((exercise) => (
-                <div className="sheet-exercise" key={exercise.id}>
-                  <button onClick={() => openDemo(exercise)}><ExerciseThumb exercise={exercise} /></button>
-                  <div>
-                    <strong>{exercise.name}</strong>
-                    <span>{exercise.target}</span>
-                    <small>{exercise.sets} sets · {exercise.reps} · {exercise.rir}</small>
-                  </div>
-                  <button className="demo-pill" onClick={() => openDemo(exercise)}>
-                    {exercise.videoUrl ? "▶ Demo" : "↗ Guide"}
-                  </button>
-                </div>
-              ))}
-            </div>
-            <Button className="sheet-start" onClick={() => startWorkout(previewSession)}>Start routine</Button>
-          </div>
-        </div>
-      ) : null}
-
-      {demoExercise ? (
-        <div className="modal-backdrop" onClick={() => setDemoExercise(null)}>
-          <div className="demo-modal" onClick={(event) => event.stopPropagation()}>
-            <div className="modal-head">
-              <div>
-                <strong>{demoExercise.name}</strong>
-                <span>{demoExercise.target}</span>
-              </div>
-              <button onClick={() => setDemoExercise(null)}>✕</button>
-            </div>
-            {demoExercise.videoUrl ? (
-              <div className="video-frame">
-                <iframe
-                  src={demoExercise.videoUrl}
-                  title={demoExercise.name + " exercise demonstration"}
-                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-                  allowFullScreen
-                />
-              </div>
-            ) : (
-              <button className="animation-placeholder" onClick={() => window.open(demoExercise.demoUrl, "_blank", "noopener,noreferrer")}>
+              <div className="animation-stage">
+                <ExerciseAnimation exercise={demoExercise} size="large" />
+              </div>>
                 <ExerciseThumb exercise={demoExercise} size="large" />
                 <span>Open animated exercise guide</span>
               </button>
@@ -1100,7 +720,7 @@ export default function Home() {
               <span>Why it is here</span>
               <p>{demoExercise.why}</p>
             </div>
-            <a className="guide-link" href={demoExercise.demoUrl} target="_blank" rel="noreferrer">Open full animated guide ↗</a>
+            <div className="guide-link static-guide">Built-in looping movement guide</div>
           </div>
         </div>
       ) : null}
