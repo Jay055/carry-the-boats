@@ -709,11 +709,7 @@ export default function Home() {
               </div>
               <div className="animation-stage">
                 <ExerciseAnimation exercise={demoExercise} size="large" />
-              </div>>
-                <ExerciseThumb exercise={demoExercise} size="large" />
-                <span>Open animated exercise guide</span>
-              </button>
-            )}
+              </div>
             <div className="demo-info">
               <span>Technique</span>
               <p>{demoExercise.cue}</p>
