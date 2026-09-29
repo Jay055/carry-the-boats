@@ -12,7 +12,7 @@ import {
   type Equipment,
   type Exercise,
   type Session
-} from "@/lib/program";
+} from "../lib/program";
 
 type SetLog = { weight: string; reps: string; rir: string; done: boolean };
 type Workout = {
