@@ -146,6 +146,7 @@ export const sessions: Session[] = [
         equipment: ["Row machine", "Dumbbells", "Bench"],
         alternatives: ["Seated cable row", "Machine row", "Incline-bench dumbbell row"],
         demoUrl: "https://musclewiki.com/exercise/machine-chest-supported-t-bar-row",
+        videoUrl: "https://www.youtube.com/embed/af-WbPlA_iY",
         loadStep: 2.5
       },
       {
@@ -183,6 +184,7 @@ export const sessions: Session[] = [
         equipment: ["Dumbbells"],
         alternatives: ["Machine shrug", "Cable shrug"],
         demoUrl: "https://musclewiki.com/exercise/dumbbell-shrug",
+        videoUrl: "https://www.youtube.com/embed/xiLT85G_GuU",
         loadStep: 5
       }
     ]
@@ -217,6 +219,7 @@ export const sessions: Session[] = [
         equipment: ["Seated leg curl"],
         alternatives: ["Lying leg curl", "Standing single-leg curl", "Controlled dumbbell RDL if comfortable"],
         demoUrl: mw("seated-leg-curl"),
+        videoUrl: "https://www.youtube.com/embed/G5iP_YcDQdE",
         loadStep: 2.5, priority: true
       },
       {
@@ -348,6 +351,7 @@ export const sessions: Session[] = [
         equipment: ["Seated leg curl"],
         alternatives: ["Lying leg curl", "Standing single-leg curl"],
         demoUrl: mw("seated-leg-curl"),
+        videoUrl: "https://www.youtube.com/embed/G5iP_YcDQdE",
         loadStep: 2.5
       }
     ]
@@ -418,6 +422,7 @@ export const sessions: Session[] = [
         equipment: ["Seated leg curl"],
         alternatives: ["Lying leg curl", "Standing single-leg curl"],
         demoUrl: mw("seated-leg-curl"),
+        videoUrl: "https://www.youtube.com/embed/G5iP_YcDQdE",
         loadStep: 2.5
       },
       {
