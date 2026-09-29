@@ -68,6 +68,19 @@ function secsToClock(value: number) {
   return min + ":" + sec;
 }
 
+function lastDays(count: number) {
+  return Array.from({ length: count }, (_, index) => {
+    const d = new Date();
+    d.setHours(12, 0, 0, 0);
+    d.setDate(d.getDate() - (count - 1 - index));
+    return {
+      date: d.toISOString().slice(0, 10),
+      weekday: d.toLocaleDateString("en-GB", { weekday: "short" }),
+      day: d.getDate()
+    };
+  });
+}
+
 function latestExerciseLogs(workouts: Workout[]) {
   const result: Record<string, SetLog[]> = {};
   for (const workout of [...workouts].reverse()) {
@@ -167,6 +180,16 @@ export default function Home() {
   }, [timer]);
 
   const previous = useMemo(() => latestExerciseLogs(store.workouts), [store.workouts]);
+  const dayStrip = useMemo(() => lastDays(14), []);
+  const workoutsByDate = useMemo(() => {
+    const map: Record<string, string[]> = {};
+    for (const workout of store.workouts) {
+      if (!workout.completed) continue;
+      if (!map[workout.date]) map[workout.date] = [];
+      map[workout.date].push(workout.sessionId);
+    }
+    return map;
+  }, [store.workouts]);
   const chosenSession = sessions.find((session) => session.id === selected) || sessions[0];
   const completedThisWeek = store.workouts.filter(
     (workout) =>
@@ -541,6 +564,23 @@ export default function Home() {
                 <h2>Proof, not vibes.</h2>
                 <p>Use performance trends and bodyweight trends to decide whether the plan is working.</p>
               </div>
+            </div>
+
+            <div className="calendar-strip" aria-label="Recent workout calendar">
+              {dayStrip.map((day) => {
+                const entries = workoutsByDate[day.date] || [];
+                return (
+                  <div className={day.date === isoDate() ? "cal-day today" : "cal-day"} key={day.date}>
+                    <span>{day.weekday}</span>
+                    <strong>{day.day}</strong>
+                    <div className="cal-sessions">
+                      {entries.map((sessionId, index) => (
+                        <b key={sessionId + "-" + index}>{sessionId}</b>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })}
             </div>
 
             <div className="progress-grid">
