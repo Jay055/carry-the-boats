@@ -148,6 +148,7 @@ export default function Home() {
   const [active, setActive] = useState<Workout | null>(null);
   const [timer, setTimer] = useState(0);
   const [timerLabel, setTimerLabel] = useState("Rest");
+  const [videoOpen, setVideoOpen] = useState<string | null>(null);
   const [bodyWeight, setBodyWeight] = useState("");
   const [waist, setWaist] = useState("");
   const [startedAt, setStartedAt] = useState<number | null>(null);
@@ -361,16 +362,39 @@ export default function Home() {
                           {exercise.sets} × {exercise.reps} · {exercise.rir} · {secsToClock(exercise.restSec)} rest
                         </p>
                       </div>
-                      <a
-                        className="demo"
-                        href={exercise.demoUrl}
-                        target="_blank"
-                        rel="noreferrer"
-                        title="Open animated exercise guide"
-                      >
-                        ▶ Demo
-                      </a>
+                      <div className="media-actions">
+                        {exercise.videoUrl ? (
+                          <button
+                            className="demo"
+                            onClick={() => setVideoOpen(videoOpen === exercise.id ? null : exercise.id)}
+                            title="Watch exercise video"
+                          >
+                            {videoOpen === exercise.id ? "✕ Close" : "▶ Video"}
+                          </button>
+                        ) : null}
+                        <a
+                          className="demo"
+                          href={exercise.demoUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          title="Open animated exercise guide"
+                        >
+                          ↗ Guide
+                        </a>
+                      </div>
                     </div>
+
+                    {exercise.videoUrl && videoOpen === exercise.id ? (
+                      <div className="inline-video">
+                        <iframe
+                          src={exercise.videoUrl}
+                          title={exercise.name + " exercise demonstration"}
+                          loading="lazy"
+                          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                          allowFullScreen
+                        />
+                      </div>
+                    ) : null}
 
                     <div className="exercise-info">
                       <div>
