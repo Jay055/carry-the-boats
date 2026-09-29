@@ -22,3 +22,18 @@ jobs:
 
       - name: Build
         run: npm run build
+
+      - name: Production smoke test
+        run: |
+          npm run start -- -p 3000 > /tmp/carry-the-boats.log 2>&1 &
+          APP_PID=$!
+          trap "kill $APP_PID || true" EXIT
+          for i in {1..30}; do
+            if curl --fail --silent http://127.0.0.1:3000 | grep -q "CARRY THE BOATS"; then
+              echo "Production server is serving the app."
+              exit 0
+            fi
+            sleep 1
+          done
+          cat /tmp/carry-the-boats.log
+          exit 1
