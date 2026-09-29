@@ -123,3 +123,20 @@ drop trigger if exists on_auth_user_created on auth.users;
 create trigger on_auth_user_created
 after insert on auth.users
 for each row execute procedure public.handle_new_user();
+
+
+create table if not exists public.app_state (
+  profile_id uuid primary key references public.profiles(id) on delete cascade,
+  payload jsonb not null default '{}'::jsonb,
+  updated_at timestamptz not null default now()
+);
+
+alter table public.app_state enable row level security;
+revoke all on public.app_state from anon;
+grant select, insert, update, delete on public.app_state to authenticated;
+
+drop policy if exists "app state own row" on public.app_state;
+create policy "app state own row" on public.app_state
+  for all to authenticated
+  using ((select auth.uid()) = profile_id)
+  with check ((select auth.uid()) = profile_id);
