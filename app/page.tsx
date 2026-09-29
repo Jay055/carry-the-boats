@@ -29,7 +29,7 @@ type BodyEntry = { date: string; weight: number; waist?: number };
 type AppStore = { workouts: Workout[]; body: BodyEntry[]; equipment: Equipment[] };
 type Tab = "train" | "progress" | "plan" | "guide" | "settings";
 
-const STORAGE_KEY = "carry-the-boats-v4";
+const STORAGE_KEY = "carry-the-boats-v5";
 
 function isoDate() {
   return new Date().toISOString().slice(0, 10);
@@ -205,6 +205,29 @@ export default function Home() {
       map[workout.date].push(workout.sessionId);
     }
     return map;
+  }, [store.workouts]);
+  const strengthMarkers = useMemo(() => {
+    const definitions = [
+      ["press", "Shoulder press"],
+      ["leg-press", "Leg press"],
+      ["pulldown", "Lat pulldown"],
+      ["cable-lateral-raise", "Lateral raise"]
+    ] as const;
+    return definitions.map(([exerciseId, label]) => {
+      let best: { weight: number; reps: number } | null = null;
+      for (const workout of store.workouts) {
+        if (!workout.completed) continue;
+        for (const set of workout.sets[exerciseId] || []) {
+          const weight = Number(set.weight);
+          const reps = Number(set.reps);
+          if (!set.done || !Number.isFinite(weight) || weight <= 0 || !Number.isFinite(reps) || reps <= 0) continue;
+          if (!best || weight > best.weight || (weight === best.weight && reps > best.reps)) {
+            best = { weight, reps };
+          }
+        }
+      }
+      return { exerciseId, label, best };
+    });
   }, [store.workouts]);
   const chosenSession = sessions.find((session) => session.id === selected) || sessions[0];
   const completedThisWeek = store.workouts.filter(
@@ -632,6 +655,16 @@ export default function Home() {
               })}
             </div>
 
+            <div className="strength-markers">
+              {strengthMarkers.map((marker) => (
+                <div className="strength-marker" key={marker.exerciseId}>
+                  <span>{marker.label}</span>
+                  <strong>{marker.best ? marker.best.weight + " kg × " + marker.best.reps : "No set yet"}</strong>
+                  <small>best logged load</small>
+                </div>
+              ))}
+            </div>
+
             <div className="progress-grid">
               <article className="panel">
                 <h3>Body metrics</h3>
@@ -754,6 +787,21 @@ export default function Home() {
                 <h2>The rules that stop us wasting months.</h2>
               </div>
             </div>
+
+            <article className="panel shoulder-goal">
+              <div className="eyebrow">SHOULDER SHAPE</div>
+              <h3>Width and a fuller “higher” shoulder line come from different muscles.</h3>
+              <div className="shoulder-columns">
+                <div>
+                  <strong>Wider</strong>
+                  <p>Lateral-delt growth is the main visual lever, so direct lateral raises get priority volume twice in the three-day baseline.</p>
+                </div>
+                <div>
+                  <strong>Fuller / higher-looking</strong>
+                  <p>Upper-trap and overall delt development can make the shoulder-to-neck line look more substantial. Bone structure and clavicle slope themselves are not trainable.</p>
+                </div>
+              </div>
+            </article>
 
             <div className="principle-grid">
               {principles.map(([title, text], index) => (
