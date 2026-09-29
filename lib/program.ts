@@ -417,8 +417,8 @@ export const weeklyDirectSets = [
   ["Rear delts", "5 baseline / 7 with D"],
   ["Upper traps", "2 baseline / 4 with D"],
   ["Lats / upper back", "12+ across A + C"],
-  ["Quads", "8 baseline / 10 with D"],
-  ["Hamstrings", "5 baseline / 7 with D"]
+  ["Quads", "9 baseline / 11 with D"],
+  ["Hamstrings", "7 baseline / 9 with D"]
 ];
 
 export const principles = [
