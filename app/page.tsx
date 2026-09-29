@@ -9,7 +9,6 @@ import {
   principles,
   science,
   sessions,
-  weeklyDirectSets,
   type Equipment,
   type Exercise,
   type Session
@@ -1136,33 +1135,31 @@ export default function Home() {
           <section className="tab-page">
             <div className="progress-overview">
               <div><span>This week</span><strong>{completedThisWeek.length}</strong><small>workouts</small></div>
-              <div><span>Bodyweight</span><strong>{latestBody ? latestBody.weight : "—"}</strong><small>{latestBody ? "kg" : "not logged"}</small></div>
+              <div><span>7-day avg</span><strong>{latestWeightAverage ? latestWeightAverage.toFixed(1) : "—"}</strong><small>{latestWeightAverage ? "kg" : "not logged"}</small></div>
               <div><span>Total sessions</span><strong>{store.workouts.length}</strong><small>all time</small></div>
             </div>
 
             <div className="section-title-row">
               <div>
                 <h2>Exercise progress</h2>
-                <span>Best logged load by session</span>
+                <span>Session-scoped e1RM or fixed-load reps</span>
               </div>
             </div>
 
             <div className="progress-card-grid">
-              {progressSeries.map((series) => {
-                const latest = series.values.at(-1);
-                return (
-                  <article className="progress-card" key={series.exerciseId}>
-                    <div className="progress-card-head">
-                      <div>
-                        <span>{series.label}</span>
-                        <strong>{latest ? latest + " kg" : "No data yet"}</strong>
-                      </div>
-                      <span className="chart-period">LAST 8</span>
+              {progressSeries.map((series) => (
+                <article className="progress-card" key={series.sessionId + ":" + series.exerciseId}>
+                  <div className="progress-card-head">
+                    <div>
+                      <span>{series.label} · Session {series.sessionId}</span>
+                      <strong>{series.latestLabel}</strong>
+                      <small>{series.metricLabel}</small>
                     </div>
-                    <MiniChart values={series.values} />
-                  </article>
-                );
-              })}
+                    <span className="chart-period">LAST 8</span>
+                  </div>
+                  <MiniChart values={series.values} />
+                </article>
+              ))}
             </div>
 
             <article className="body-card">
@@ -1170,6 +1167,18 @@ export default function Home() {
                 <div>
                   <h2>Body measurements</h2>
                   <span>Track the trend, not one day</span>
+                </div>
+              </div>
+              <div className="body-trend-grid">
+                <div className="body-trend-card">
+                  <div><span>Bodyweight trend</span><strong>{latestWeightAverage ? latestWeightAverage.toFixed(1) + " kg" : "No data"}</strong></div>
+                  <MiniChart values={weightRollingValues.slice(-14)} />
+                  <small>7-day rolling average</small>
+                </div>
+                <div className="body-trend-card">
+                  <div><span>Waist trend</span><strong>{latestBody?.waist ? latestBody.waist + " cm" : "No data"}</strong></div>
+                  <MiniChart values={waistTrendValues.slice(-14)} />
+                  <small>Waist flat/down while strength rises is a useful recomp signal.</small>
                 </div>
               </div>
               <div className="body-inputs">
@@ -1181,14 +1190,33 @@ export default function Home() {
                   Waist (cm)
                   <input value={waist} inputMode="decimal" onChange={(event) => setWaist(event.target.value)} placeholder="optional" />
                 </label>
+                <label>
+                  Shoulders (cm)
+                  <input value={shoulders} inputMode="decimal" onChange={(event) => setShoulders(event.target.value)} placeholder="optional" />
+                </label>
+                <label>
+                  Arms (cm)
+                  <input value={arms} inputMode="decimal" onChange={(event) => setArms(event.target.value)} placeholder="optional" />
+                </label>
+                <label>
+                  Thighs (cm)
+                  <input value={thighs} inputMode="decimal" onChange={(event) => setThighs(event.target.value)} placeholder="optional" />
+                </label>
                 <Button className="blue-button" onClick={saveBody}>Log measurement</Button>
               </div>
               <div className="measurement-history">
                 {[...store.body].reverse().slice(0, 8).map((entry) => (
-                  <div key={entry.date + entry.weight}>
+                  <div className="measurement-row" key={entry.date + entry.weight + String(entry.waist || "")}>
                     <span>{entry.date}</span>
                     <strong>{entry.weight} kg</strong>
-                    <small>{entry.waist ? entry.waist + " cm waist" : ""}</small>
+                    <small>
+                      {[
+                        entry.waist ? "Waist " + entry.waist : "",
+                        entry.shoulders ? "Shoulders " + entry.shoulders : "",
+                        entry.arms ? "Arms " + entry.arms : "",
+                        entry.thighs ? "Thighs " + entry.thighs : ""
+                      ].filter(Boolean).join(" · ")}
+                    </small>
                   </div>
                 ))}
               </div>
@@ -1197,21 +1225,24 @@ export default function Home() {
             <article className="volume-card">
               <div className="section-title-row compact">
                 <div>
-                  <h2>Program volume</h2>
-                  <span>Baseline direct sets</span>
+                  <h2>Completed volume this week</h2>
+                  <span>Direct working sets you actually logged</span>
                 </div>
               </div>
               <div className="volume-bars">
-                {weeklyDirectSets.map(([muscle, sets]) => {
-                  const baseline = Number(sets.match(/\d+/)?.[0] || 0);
-                  return (
-                    <div key={muscle}>
-                      <div><span>{muscle}</span><strong>{sets}</strong></div>
-                      <i><b style={{ width: Math.min(100, baseline * 8) + "%" }} /></i>
+                {actualWeeklyVolume.map(([muscle, sets]) => (
+                  <div key={muscle}>
+                    <div>
+                      <span>{muscle}</span>
+                      <strong>{sets} / {VOLUME_REFERENCE_SETS} sets</strong>
                     </div>
-                  );
-                })}
+                    <i><b style={{ width: Math.min(100, (sets / VOLUME_REFERENCE_SETS) * 100) + "%" }} /></i>
+                  </div>
+                ))}
               </div>
+              <p className="volume-note">
+                The 10-set marker is a hypertrophy-volume reference, not a pass/fail threshold. Direct sets are counted conservatively; compound overlap is not double-counted.
+              </p>
             </article>
           </section>
         ) : null}
