@@ -140,3 +140,14 @@ create policy "app state own row" on public.app_state
   for all to authenticated
   using ((select auth.uid()) = profile_id)
   with check ((select auth.uid()) = profile_id);
+
+
+create table if not exists public.private_sync_state (
+  sync_id text primary key,
+  payload jsonb not null default '{}'::jsonb,
+  client_updated_at bigint not null default 0,
+  updated_at timestamptz not null default now()
+);
+
+alter table public.private_sync_state enable row level security;
+revoke all on public.private_sync_state from anon, authenticated;
