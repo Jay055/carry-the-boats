@@ -78,7 +78,18 @@ export const allEquipment: Equipment[] = [
   "Treadmill / bike / rower",
 ];
 
-export const defaultEquipment = allEquipment;
+export const defaultEquipment: Equipment[] = [
+  "Dumbbells",
+  "Cable station",
+  "Lat pulldown",
+  "Leg press",
+  "Bench",
+  "Chest press machine",
+  "Power rack / barbells",
+  "EGYM",
+  "TRX",
+  "Treadmill / bike / rower",
+];
 
 export const sessions: Session[] = [
   {
@@ -186,7 +197,7 @@ export const sessions: Session[] = [
       {
         id: "leg-press",
         name: "Leg Press",
-        sets: 3, reps: "6–10", minRep: 6, maxRep: 10, rir: "2 RIR", restSec: 180,
+        sets: 4, reps: "6–10", minRep: 6, maxRep: 10, rir: "2 RIR", restSec: 180,
         target: "Quads + glutes",
         cue: "Use a comfortable stance and pain-free depth; keep the pelvis controlled.",
         why: "A stable compound that loads the legs hard without making a heavy barbell squat mandatory.",
@@ -199,7 +210,7 @@ export const sessions: Session[] = [
       {
         id: "seated-leg-curl",
         name: "Seated Leg Curl",
-        sets: 3, reps: "8–12", minRep: 8, maxRep: 12, rir: "1–2 RIR", restSec: 120,
+        sets: 4, reps: "8–12", minRep: 8, maxRep: 12, rir: "1–2 RIR", restSec: 120,
         target: "Hamstrings",
         cue: "Keep hips pinned and control the stretched position.",
         why: "High hamstring stimulus with little balance or spinal demand.",
@@ -330,7 +341,7 @@ export const sessions: Session[] = [
       {
         id: "seated-leg-curl",
         name: "Seated Leg Curl",
-        sets: 2, reps: "10–15", minRep: 10, maxRep: 15, rir: "1–2 RIR", restSec: 105,
+        sets: 3, reps: "10–15", minRep: 10, maxRep: 15, rir: "1–2 RIR", restSec: 105,
         target: "Hamstrings",
         cue: "Keep the hips planted and control every rep.",
         why: "A second hamstring exposure with a low fatigue cost.",
