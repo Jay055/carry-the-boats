@@ -1236,3 +1236,282 @@ svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width:
   .set-labels { font-size: .48rem; }
   .week-card { align-items: flex-start; flex-direction: column; }
 }
+
+
+/* Built-in exercise motion system — no external video dependency */
+.exercise-motion {
+  width: 54px;
+  height: 54px;
+  border-radius: 11px;
+  overflow: hidden;
+  position: relative;
+  background:
+    radial-gradient(circle at 72% 22%, rgba(91,124,255,.22), transparent 35%),
+    linear-gradient(145deg, #202632, #141820);
+  flex: 0 0 auto;
+  border: 1px solid #303743;
+}
+.exercise-motion.small { width: 40px; height: 40px; border-radius: 9px; }
+.exercise-motion.large { width: 100%; height: 210px; border-radius: 13px; }
+.exercise-motion svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+  overflow: visible;
+  color: #d6dcff;
+  stroke-width: 2.6;
+}
+.exercise-motion.large svg { stroke-width: 2; }
+.exercise-motion .motion-head { fill: #cfd8ff; stroke: #cfd8ff; }
+.exercise-motion .motion-torso,
+.exercise-motion .motion-arm,
+.exercise-motion .motion-forearm,
+.exercise-motion .motion-thigh,
+.exercise-motion .motion-shin {
+  stroke: #d7ddff;
+}
+.exercise-motion .motion-weight {
+  fill: var(--blue);
+  stroke: var(--blue);
+}
+.exercise-motion .motion-ground {
+  stroke: rgba(255,255,255,.12);
+  stroke-width: 1.4;
+}
+.exercise-motion .motion-equipment > * {
+  opacity: 0;
+  stroke: #5f6b7d;
+  fill: rgba(95,107,125,.08);
+}
+.exercise-motion .motion-arrow {
+  opacity: 0;
+  stroke: var(--blue-2);
+  fill: none;
+  stroke-width: 2.2;
+  stroke-dasharray: 4 4;
+}
+.exercise-motion .motion-person,
+.exercise-motion .motion-arms,
+.exercise-motion .motion-forearms,
+.exercise-motion .motion-legs,
+.exercise-motion .motion-lower-legs,
+.exercise-motion .sled-shape,
+.exercise-motion .machine-pad {
+  transform-box: fill-box;
+  transform-origin: center;
+}
+.exercise-motion.paused * { animation-play-state: paused !important; }
+
+/* Press */
+.motion-press .motion-arms,
+.motion-press .motion-forearms,
+.motion-press .motion-weight {
+  animation: motion-press 1.55s ease-in-out infinite;
+}
+.motion-press .arrow-up { opacity: .8; }
+@keyframes motion-press {
+  0%, 100% { transform: translateY(0); }
+  48% { transform: translateY(-22px); }
+}
+
+/* Pulldown */
+.motion-pulldown .cable-post,
+.motion-pulldown .cable-line { opacity: .85; }
+.motion-pulldown .motion-arms,
+.motion-pulldown .motion-forearms {
+  animation: motion-pulldown 1.55s ease-in-out infinite;
+}
+.motion-pulldown .arrow-up { opacity: .75; transform: rotate(180deg); transform-origin: 103px 53px; }
+@keyframes motion-pulldown {
+  0%, 100% { transform: translateY(-16px) scaleY(.95); }
+  52% { transform: translateY(8px) scaleY(.75); }
+}
+
+/* Row */
+.motion-row .cable-post,
+.motion-row .cable-line { opacity: .72; }
+.motion-row .motion-arms,
+.motion-row .motion-forearms {
+  animation: motion-row 1.45s ease-in-out infinite;
+}
+.motion-row .arrow-out { opacity: .7; transform: rotate(180deg); transform-origin: 74px 70px; }
+@keyframes motion-row {
+  0%, 100% { transform: translateX(10px); }
+  50% { transform: translateX(-9px); }
+}
+
+/* Lateral raise */
+.motion-lateral .motion-arms,
+.motion-lateral .motion-forearms,
+.motion-lateral .motion-weight {
+  animation: motion-lateral 1.6s ease-in-out infinite;
+  transform-origin: 50% 15%;
+}
+.motion-lateral .arrow-out { opacity: .85; }
+@keyframes motion-lateral {
+  0%, 100% { transform: scaleX(.72) translateY(3px); }
+  50% { transform: scaleX(1.65) translateY(-6px); }
+}
+
+/* Reverse fly */
+.motion-reverse-fly .bench-shape { opacity: .75; }
+.motion-reverse-fly .motion-person { transform: rotate(15deg) translate(5px, 3px); transform-origin: 50% 55%; }
+.motion-reverse-fly .motion-arms,
+.motion-reverse-fly .motion-forearms {
+  animation: motion-reverse-fly 1.5s ease-in-out infinite;
+  transform-origin: 50% 20%;
+}
+.motion-reverse-fly .arrow-out { opacity: .78; }
+@keyframes motion-reverse-fly {
+  0%, 100% { transform: scaleX(.7); }
+  50% { transform: scaleX(1.7); }
+}
+
+/* Shrug */
+.motion-shrug .motion-person {
+  animation: motion-shrug 1.25s ease-in-out infinite;
+}
+.motion-shrug .motion-weight { fill: #8fa2ff; }
+.motion-shrug .arrow-up { opacity: .78; }
+@keyframes motion-shrug {
+  0%, 100% { transform: translateY(2px); }
+  50% { transform: translateY(-6px); }
+}
+
+/* Leg press */
+.motion-leg-press .sled-shape,
+.motion-leg-press .machine-pad { opacity: .9; }
+.motion-leg-press .bench-shape { opacity: .55; transform: rotate(-30deg); transform-origin: center; }
+.motion-leg-press .motion-person {
+  transform: rotate(-50deg) translate(-14px, 21px) scale(.92);
+  transform-origin: 50% 55%;
+}
+.motion-leg-press .motion-legs {
+  animation: motion-leg-press 1.65s ease-in-out infinite;
+  transform-origin: 48% 10%;
+}
+.motion-leg-press .sled-shape {
+  animation: motion-sled 1.65s ease-in-out infinite;
+}
+.motion-leg-press .arrow-out { opacity: .8; }
+@keyframes motion-leg-press {
+  0%, 100% { transform: scaleX(.72); }
+  50% { transform: scaleX(1.35); }
+}
+@keyframes motion-sled {
+  0%, 100% { transform: translateX(-7px); }
+  50% { transform: translateX(5px); }
+}
+
+/* Seated leg curl */
+.motion-leg-curl .bench-shape,
+.motion-leg-curl .machine-pad { opacity: .8; }
+.motion-leg-curl .motion-person {
+  transform: translateY(9px) scale(.92);
+}
+.motion-leg-curl .motion-lower-legs {
+  animation: motion-leg-curl 1.45s ease-in-out infinite;
+  transform-origin: 50% 0%;
+}
+@keyframes motion-leg-curl {
+  0%, 100% { transform: rotate(0deg); }
+  50% { transform: rotate(42deg) translateY(-3px); }
+}
+
+/* Hip thrust */
+.motion-hip-thrust .bench-shape { opacity: .85; }
+.motion-hip-thrust .motion-person {
+  transform: rotate(72deg) translate(13px, -20px) scale(.9);
+  transform-origin: 50% 55%;
+}
+.motion-hip-thrust .motion-torso,
+.motion-hip-thrust .motion-head {
+  animation: motion-hip-thrust 1.55s ease-in-out infinite;
+  transform-box: fill-box;
+  transform-origin: 50% 100%;
+}
+.motion-hip-thrust .arrow-up { opacity: .82; }
+@keyframes motion-hip-thrust {
+  0%, 100% { transform: translateY(7px); }
+  50% { transform: translateY(-7px); }
+}
+
+/* Leg extension */
+.motion-leg-extension .bench-shape,
+.motion-leg-extension .machine-pad { opacity: .82; }
+.motion-leg-extension .motion-person { transform: translateY(8px) scale(.92); }
+.motion-leg-extension .motion-lower-legs {
+  animation: motion-leg-extension 1.4s ease-in-out infinite;
+  transform-origin: 50% 0%;
+}
+.motion-leg-extension .arrow-out { opacity: .8; }
+@keyframes motion-leg-extension {
+  0%, 100% { transform: rotate(25deg); }
+  50% { transform: rotate(-55deg) translate(5px,-4px); }
+}
+
+/* Calf raise */
+.motion-calf .motion-person {
+  animation: motion-calf 1.1s ease-in-out infinite;
+}
+.motion-calf .arrow-up { opacity: .78; }
+@keyframes motion-calf {
+  0%, 100% { transform: translateY(3px); }
+  50% { transform: translateY(-5px); }
+}
+
+/* Curl */
+.motion-curl .motion-forearms,
+.motion-curl .motion-weight {
+  animation: motion-curl 1.35s ease-in-out infinite;
+  transform-origin: 50% 0%;
+}
+.motion-curl .cable-post,
+.motion-curl .cable-line { opacity: .5; }
+.motion-curl .arrow-up { opacity: .75; }
+@keyframes motion-curl {
+  0%, 100% { transform: rotate(0deg) translateY(0); }
+  50% { transform: rotate(-42deg) translateY(-9px); }
+}
+
+/* Triceps pushdown */
+.motion-pushdown .cable-post,
+.motion-pushdown .cable-line { opacity: .8; }
+.motion-pushdown .motion-forearms {
+  animation: motion-pushdown 1.3s ease-in-out infinite;
+  transform-origin: 50% 0%;
+}
+.motion-pushdown .arrow-up { opacity: .75; transform: rotate(180deg); transform-origin: 103px 53px; }
+@keyframes motion-pushdown {
+  0%, 100% { transform: rotate(-35deg) translateY(-7px); }
+  50% { transform: rotate(5deg) translateY(5px); }
+}
+
+.animation-stage {
+  width: 100%;
+  border-radius: 14px;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  background: #10141b;
+  padding: 10px;
+}
+.animation-stage .exercise-motion.large {
+  border: 0;
+  background:
+    radial-gradient(circle at 70% 18%, rgba(91,124,255,.16), transparent 30%),
+    #10141b;
+}
+.static-guide {
+  cursor: default;
+  color: var(--blue-2);
+  background: rgba(91,124,255,.08);
+  border: 1px solid rgba(91,124,255,.18);
+}
+
+/* old image/video surfaces intentionally suppressed */
+.exercise-thumb,
+.exercise-fallback,
+.video-frame,
+.animation-placeholder { display: none !important; }
+.history-exercises .exercise-motion.small { width: 32px; height: 32px; }
+.animation-placeholder .exercise-motion.large { width: 160px; }
