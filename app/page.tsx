@@ -31,8 +31,15 @@ type Tab = "train" | "progress" | "plan" | "guide" | "settings";
 
 const STORAGE_KEY = "carry-the-boats-v5";
 
-function isoDate() {
-  return new Date().toISOString().slice(0, 10);
+function isoDate(date = new Date()) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return year + "-" + month + "-" + day;
+}
+
+function nextCoreId(id: "A" | "B" | "C") {
+  return id === "A" ? "B" : id === "B" ? "C" : "A";
 }
 
 function weekStart() {
@@ -75,7 +82,7 @@ function lastDays(count: number) {
     d.setHours(12, 0, 0, 0);
     d.setDate(d.getDate() - (count - 1 - index));
     return {
-      date: d.toISOString().slice(0, 10),
+      date: isoDate(d),
       weekday: d.toLocaleDateString("en-GB", { weekday: "short" }),
       day: d.getDate()
     };
@@ -104,8 +111,16 @@ function progressionAdvice(exercise: Exercise, previous?: SetLog[]) {
     .map((set) => Number(set.weight))
     .filter((n) => Number.isFinite(n) && n > 0);
   const sameWeight = weights.length > 0 && weights.every((w) => w === weights[0]);
+  const targetRir = Number(exercise.rir.match(/\d+/)?.[0] || 0);
+  const actualRirs = done
+    .map((set) => Number(set.rir))
+    .filter((n) => Number.isFinite(n) && n >= 0);
+  const rirReady = actualRirs.length < done.length || Math.min(...actualRirs) >= targetRir;
 
-  if (sameWeight && min >= exercise.maxRep) {
+  if (sameWeight && min >= exercise.maxRep && !rirReady) {
+    return "Hold the load: you hit the top reps, but first repeat them with the planned reps in reserve.";
+  }
+  if (sameWeight && min >= exercise.maxRep && rirReady) {
     return "Progress: add about " + exercise.loadStep + " kg next time, then rebuild within " + exercise.reps + ".";
   }
   if (min >= exercise.minRep) {
@@ -156,7 +171,7 @@ export default function Home() {
 
   useEffect(() => {
     try {
-      const raw = localStorage.getItem(STORAGE_KEY);
+      const raw = localStorage.getItem(STORAGE_KEY) || localStorage.getItem("carry-the-boats-v4");
       if (raw) {
         const parsed = JSON.parse(raw) as Partial<AppStore>;
         const parsedWorkouts = parsed.workouts || [];
@@ -169,13 +184,8 @@ export default function Home() {
           .reverse()
           .find((workout) => workout.completed && workout.sessionId !== "D");
         if (lastCore) {
-          const nextCore: Record<"A" | "B" | "C", "A" | "B" | "C"> = {
-            A: "B",
-            B: "C",
-            C: "A"
-          };
           if (lastCore.sessionId === "A" || lastCore.sessionId === "B" || lastCore.sessionId === "C") {
-            setSelected(nextCore[lastCore.sessionId]);
+            setSelected(nextCoreId(lastCore.sessionId));
           }
         }
       }
@@ -282,9 +292,16 @@ export default function Home() {
       ...current,
       workouts: [...current.workouts.filter((w) => w.id !== saved.id), saved]
     }));
-    if (active.sessionId === "A") setSelected("B");
-    if (active.sessionId === "B") setSelected("C");
-    if (active.sessionId === "C") setSelected("A");
+    if (active.sessionId === "A" || active.sessionId === "B" || active.sessionId === "C") {
+      setSelected(nextCoreId(active.sessionId));
+    } else {
+      const lastCore = [...store.workouts].reverse().find(
+        (workout) => workout.completed && workout.sessionId !== "D"
+      );
+      if (lastCore && (lastCore.sessionId === "A" || lastCore.sessionId === "B" || lastCore.sessionId === "C")) {
+        setSelected(nextCoreId(lastCore.sessionId));
+      }
+    }
     setActive(null);
     setStartedAt(null);
     setTimer(0);
@@ -383,7 +400,18 @@ export default function Home() {
                 <h2>{sessions.find((s) => s.id === active.sessionId)?.title}</h2>
                 <p>{totalSets} working sets logged. Previous performance is shown beside today.</p>
               </div>
-              <Button className="ghost" onClick={() => setActive(null)}>Exit</Button>
+              <Button
+                className="ghost"
+                onClick={() => {
+                  if (totalSets === 0 || window.confirm("Discard this unfinished workout?")) {
+                    setActive(null);
+                    setStartedAt(null);
+                    setTimer(0);
+                  }
+                }}
+              >
+                Exit
+              </Button>
             </div>
 
             {active.sessionId === "D" ? (
@@ -541,7 +569,7 @@ export default function Home() {
                   }
                 />
               </label>
-              <Button className="primary finish" onClick={finishWorkout}>
+              <Button className="primary finish" onClick={finishWorkout} disabled={totalSets === 0}>
                 Finish & save workout
               </Button>
             </div>
@@ -593,10 +621,12 @@ export default function Home() {
 
               <div className="session-grid">
                 {sessions.map((session) => (
-                  <article
+                  <button
+                    type="button"
                     className={selected === session.id ? "session-card selected" : "session-card"}
                     key={session.id}
                     onClick={() => setSelected(session.id)}
+                    aria-pressed={selected === session.id}
                   >
                     <div className="session-id">{session.id}</div>
                     <div className="session-copy">
@@ -611,7 +641,7 @@ export default function Home() {
                         ))}
                       </div>
                     </div>
-                  </article>
+                  </button>
                 ))}
               </div>
 
