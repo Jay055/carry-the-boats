@@ -38,13 +38,18 @@ type AppStore = {
   equipment: Equipment[];
   updatedAt: number;
 };
-type Tab = "workout" | "history" | "progress" | "program";
+type MainTab = "program" | "workout" | "progress" | "nutrition" | "more";
+type ProgressTab = "exercises" | "weight" | "body";
+type ThemeMode = "system" | "light" | "dark";
+type ExerciseDetailTab = "animation" | "muscles" | "steps";
+type WeightPickerState = { exerciseId: string; index: number; exerciseName: string } | null;
 
-const STORAGE_KEY = "carry-the-boats-v7";
-const LEGACY_KEYS = ["carry-the-boats-v6", "carry-the-boats-v5", "carry-the-boats-v4"];
+const STORAGE_KEY = "carry-the-boats-v8";
+const LEGACY_KEYS = ["carry-the-boats-v7", "carry-the-boats-v6", "carry-the-boats-v5", "carry-the-boats-v4"];
+const THEME_KEY = "carry-the-boats-theme-v1";
 const SYNC_KEY_STORAGE = "carry-the-boats-recovery-key-v1";
 const SYNC_ENDPOINT = "https://xzgxqylefceimcciwzmm.supabase.co/functions/v1/workout-sync";
-
+const WEIGHT_OPTIONS = [5,10,12.5,15,17.5,20,22.5,25,27.5,30,32.5,35,40,45,50,55,60,65,70,75,80,85,90,100];
 const DIRECT_VOLUME_GROUPS: Record<string, string[]> = {
   incline: ["Upper chest"],
   inclineC: ["Upper chest"],
@@ -60,7 +65,6 @@ const DIRECT_VOLUME_GROUPS: Record<string, string[]> = {
   "seated-leg-curl": ["Hamstrings"],
   hip: ["Glutes"]
 };
-
 const VOLUME_REFERENCE_SETS = 10;
 
 function isoDate(date = new Date()) {
@@ -69,11 +73,9 @@ function isoDate(date = new Date()) {
   const day = String(date.getDate()).padStart(2, "0");
   return year + "-" + month + "-" + day;
 }
-
 function nextCoreId(id: "A" | "B" | "C") {
   return id === "A" ? "B" : id === "B" ? "C" : "A";
 }
-
 function weekStart() {
   const d = new Date();
   const weekday = (d.getDay() + 6) % 7;
@@ -81,7 +83,6 @@ function weekStart() {
   d.setDate(d.getDate() - weekday);
   return d;
 }
-
 function emptyWorkout(session: Session): Workout {
   const sets: Record<string, SetLog[]> = {};
   for (const exercise of session.exercises) {
@@ -101,45 +102,25 @@ function emptyWorkout(session: Session): Workout {
     completed: false
   };
 }
-
+function workoutVolume(workout: Workout) {
+  return Object.values(workout.sets).flat().filter((set) => set.done)
+    .reduce((sum, set) => sum + (Number(set.weight) || 0) * (Number(set.reps) || 0), 0);
+}
+function completedSetCount(workout: Workout) {
+  return Object.values(workout.sets).flat().filter((set) => set.done).length;
+}
 function secsToClock(value: number) {
   const min = Math.floor(value / 60);
   const sec = String(value % 60).padStart(2, "0");
   return min + ":" + sec;
 }
-
 function formatDuration(seconds: number) {
   const hours = Math.floor(seconds / 3600);
   const minutes = Math.floor((seconds % 3600) / 60);
   const secs = seconds % 60;
-  if (hours > 0) return hours + ":" + String(minutes).padStart(2, "0") + ":" + String(secs).padStart(2, "0");
-  return String(minutes).padStart(2, "0") + ":" + String(secs).padStart(2, "0");
+  if (hours) return hours + "h " + String(minutes).padStart(2, "0") + "m";
+  return minutes + ":" + String(secs).padStart(2, "0");
 }
-
-function lastDays(count: number) {
-  return Array.from({ length: count }, (_, index) => {
-    const d = new Date();
-    d.setHours(12, 0, 0, 0);
-    d.setDate(d.getDate() - (count - 1 - index));
-    return {
-      date: isoDate(d),
-      weekday: d.toLocaleDateString("en-GB", { weekday: "short" }),
-      day: d.getDate()
-    };
-  });
-}
-
-function workoutVolume(workout: Workout) {
-  return Object.values(workout.sets)
-    .flat()
-    .filter((set) => set.done)
-    .reduce((sum, set) => sum + (Number(set.weight) || 0) * (Number(set.reps) || 0), 0);
-}
-
-function completedSetCount(workout: Workout) {
-  return Object.values(workout.sets).flat().filter((set) => set.done).length;
-}
-
 function latestExerciseLogs(workouts: Workout[]) {
   const result: Record<string, SetLog[]> = {};
   for (const workout of [...workouts].reverse()) {
@@ -151,24 +132,26 @@ function latestExerciseLogs(workouts: Workout[]) {
   }
   return result;
 }
-
-function createRecoveryKey() {
-  const bytes = new Uint8Array(32);
-  crypto.getRandomValues(bytes);
-  let binary = "";
-  for (const byte of bytes) binary += String.fromCharCode(byte);
-  return btoa(binary).replaceAll("+", "-").replaceAll("/", "_").replaceAll("=", "");
+function progressionAdvice(exercise: Exercise, previous?: SetLog[]) {
+  const done = (previous || []).filter((set) => set.done && Number(set.reps) > 0);
+  if (!done.length) return "Build a clean baseline today. Leave the planned reps in reserve.";
+  const reps = done.map((set) => Number(set.reps));
+  const min = Math.min(...reps);
+  const weights = done.map((set) => Number(set.weight)).filter((n) => Number.isFinite(n) && n > 0);
+  const sameWeight = weights.length > 0 && weights.every((w) => w === weights[0]);
+  const targetRir = Number(exercise.rir.match(/\d+/)?.[0] || 0);
+  const actualRirs = done.map((set) => Number(set.rir)).filter((n) => Number.isFinite(n) && n >= 0);
+  const rirReady = actualRirs.length < done.length || Math.min(...actualRirs) >= targetRir;
+  if (sameWeight && min >= exercise.maxRep && rirReady) {
+    return "Next session: add about " + exercise.loadStep + " kg, then rebuild inside " + exercise.reps + ".";
+  }
+  if (min >= exercise.minRep) return "Keep this load and add reps until every set reaches " + exercise.maxRep + ".";
+  return "Keep or slightly reduce the load so every work set lands in range with clean form.";
 }
-
-function hasMeaningfulData(store: AppStore) {
-  return store.workouts.length > 0 || store.body.length > 0;
-}
-
 function epleyEstimate(weight: number, reps: number) {
   if (weight <= 0 || reps <= 0 || reps > 12) return 0;
   return weight * (1 + reps / 30);
 }
-
 function rollingWeightAverage(entries: BodyEntry[]) {
   const sorted = [...entries].sort((a, b) => a.date.localeCompare(b.date));
   return sorted.map((entry, index) => {
@@ -182,184 +165,216 @@ function rollingWeightAverage(entries: BodyEntry[]) {
     return window.reduce((sum, item) => sum + item.weight, 0) / Math.max(1, window.length);
   });
 }
-
-function progressionAdvice(exercise: Exercise, previous?: SetLog[]) {
-  const done = (previous || []).filter((set) => set.done && Number(set.reps) > 0);
-  if (!done.length) {
-    return "Start conservative. Finish with the planned reps in reserve and establish a clean baseline.";
-  }
-  const reps = done.map((set) => Number(set.reps));
-  const min = Math.min(...reps);
-  const weights = done.map((set) => Number(set.weight)).filter((n) => Number.isFinite(n) && n > 0);
-  const sameWeight = weights.length > 0 && weights.every((w) => w === weights[0]);
-  const targetRir = Number(exercise.rir.match(/\d+/)?.[0] || 0);
-  const actualRirs = done.map((set) => Number(set.rir)).filter((n) => Number.isFinite(n) && n >= 0);
-  const rirReady = actualRirs.length < done.length || Math.min(...actualRirs) >= targetRir;
-
-  if (sameWeight && min >= exercise.maxRep && !rirReady) {
-    return "Repeat this load. You hit the reps, but first own them at the planned effort.";
-  }
-  if (sameWeight && min >= exercise.maxRep && rirReady) {
-    return "Progress next time: add about " + exercise.loadStep + " kg and rebuild inside " + exercise.reps + ".";
-  }
-  if (min >= exercise.minRep) {
-    return "Keep the load and add reps until every work set reaches " + exercise.maxRep + ".";
-  }
-  return "Hold or reduce the load slightly so all work sets land inside the rep range with clean technique.";
+function createRecoveryKey() {
+  const bytes = new Uint8Array(32);
+  crypto.getRandomValues(bytes);
+  let binary = "";
+  for (const byte of bytes) binary += String.fromCharCode(byte);
+  return btoa(binary).replaceAll("+", "-").replaceAll("/", "_").replaceAll("=", "");
 }
-
+function hasMeaningfulData(store: AppStore) {
+  return store.workouts.length > 0 || store.body.length > 0;
+}
 function equipmentMatch(exercise: Exercise, available: Equipment[]) {
   return exercise.equipment.some((item) => available.includes(item));
 }
+function weekDays() {
+  const now = new Date();
+  const monday = new Date(now);
+  const weekday = (now.getDay() + 6) % 7;
+  monday.setDate(now.getDate() - weekday);
+  return Array.from({ length: 7 }, (_, index) => {
+    const d = new Date(monday);
+    d.setDate(monday.getDate() + index);
+    return {
+      label: d.toLocaleDateString("en-GB", { weekday: "short" }),
+      day: d.getDate(),
+      date: isoDate(d),
+      today: isoDate(d) === isoDate()
+    };
+  });
+}
+function Button(props: ButtonHTMLAttributes<HTMLButtonElement>) {
+  const { className = "", children, ...rest } = props;
+  return <button className={"button " + className} {...rest}>{children}</button>;
+}
 
-type MotionKind =
-  | "press"
-  | "pulldown"
-  | "row"
-  | "lateral"
-  | "reverse-fly"
-  | "shrug"
-  | "leg-press"
-  | "leg-curl"
-  | "hip-thrust"
-  | "leg-extension"
-  | "calf"
-  | "curl"
-  | "pushdown";
-
+type MotionKind = "press" | "pulldown" | "row" | "lateral" | "fly" | "shrug" | "legpress" | "legcurl" | "hip" | "extension" | "calf" | "curl" | "pushdown";
 function motionKind(exercise: Exercise): MotionKind {
   if (exercise.id === "press" || exercise.id === "incline" || exercise.id === "inclineC") return "press";
   if (exercise.id === "pulldown" || exercise.id === "singlelat") return "pulldown";
   if (exercise.id === "row" || exercise.id === "rowC") return "row";
   if (exercise.id === "cable-lateral-raise") return "lateral";
-  if (exercise.id === "reverse-pec-deck") return "reverse-fly";
+  if (exercise.id === "reverse-pec-deck") return "fly";
   if (exercise.id === "shrug") return "shrug";
-  if (exercise.id === "leg-press") return "leg-press";
-  if (exercise.id === "seated-leg-curl") return "leg-curl";
-  if (exercise.id === "hip") return "hip-thrust";
-  if (exercise.id === "leg-extension") return "leg-extension";
+  if (exercise.id === "leg-press") return "legpress";
+  if (exercise.id === "seated-leg-curl") return "legcurl";
+  if (exercise.id === "hip") return "hip";
+  if (exercise.id === "leg-extension") return "extension";
   if (exercise.id === "calf") return "calf";
   if (exercise.id === "biceps") return "curl";
   return "pushdown";
 }
 
-function Button(props: ButtonHTMLAttributes<HTMLButtonElement>) {
-  const { children, className = "", ...rest } = props;
-  return (
-    <button className={"button " + className} {...rest}>
-      {children}
-    </button>
-  );
-}
-
-function ExerciseAnimation({
-  exercise,
-  size = "normal",
-  paused = false
-}: {
-  exercise: Exercise;
-  size?: "small" | "normal" | "large";
-  paused?: boolean;
-}) {
+function ExerciseArt({ exercise, compact = false }: { exercise: Exercise; compact?: boolean }) {
   const kind = motionKind(exercise);
   return (
-    <div
-      className={"exercise-motion " + size + " motion-" + kind + (paused ? " paused" : "")}
-      role="img"
-      aria-label={"Animated demonstration of " + exercise.name}
-    >
-      <svg viewBox="0 0 120 100" aria-hidden="true">
-        <line className="motion-ground" x1="12" y1="87" x2="108" y2="87" />
-        <g className="motion-person">
-          <circle className="motion-head" cx="60" cy="24" r="7" />
-          <line className="motion-torso" x1="60" y1="31" x2="60" y2="60" />
-          <g className="motion-arms">
-            <line className="motion-arm left" x1="60" y1="37" x2="44" y2="51" />
-            <line className="motion-arm right" x1="60" y1="37" x2="76" y2="51" />
-            <circle className="motion-weight weight-left" cx="43" cy="52" r="3" />
-            <circle className="motion-weight weight-right" cx="77" cy="52" r="3" />
+    <div className={"exercise-art motion-" + kind + (compact ? " compact" : "")}>
+      <svg viewBox="0 0 320 220" aria-label={"Animated " + exercise.name}>
+        <g className="art-machine">
+          <line x1="35" y1="185" x2="286" y2="185" />
+          <rect className="art-bench" x="88" y="146" width="120" height="12" rx="5" />
+          <line className="art-rack" x1="74" y1="48" x2="74" y2="183" />
+          <line className="art-rack" x1="246" y1="48" x2="246" y2="183" />
+          <line className="art-cable" x1="260" y1="40" x2="260" y2="176" />
+          <rect className="art-sled" x="218" y="90" width="50" height="62" rx="7" />
+        </g>
+        <g className="art-person">
+          <circle className="skin head" cx="150" cy="70" r="17" />
+          <path className="body torso" d="M137 88 Q150 78 163 88 L174 132 Q150 145 126 132 Z" />
+          <g className="arms">
+            <path className="limb left-arm" d="M133 96 Q110 105 92 126" />
+            <path className="limb right-arm" d="M167 96 Q190 105 208 126" />
+            <path className="limb left-forearm" d="M92 126 L82 153" />
+            <path className="limb right-forearm" d="M208 126 L218 153" />
           </g>
-          <g className="motion-forearms">
-            <line className="motion-forearm left" x1="44" y1="51" x2="45" y2="66" />
-            <line className="motion-forearm right" x1="76" y1="51" x2="75" y2="66" />
+          <g className="legs">
+            <path className="limb left-thigh" d="M139 133 Q126 155 112 174" />
+            <path className="limb right-thigh" d="M161 133 Q174 155 188 174" />
+            <path className="limb left-shin" d="M112 174 L110 204" />
+            <path className="limb right-shin" d="M188 174 L190 204" />
           </g>
-          <g className="motion-legs">
-            <line className="motion-thigh left" x1="60" y1="60" x2="48" y2="74" />
-            <line className="motion-thigh right" x1="60" y1="60" x2="72" y2="74" />
-            <g className="motion-lower-legs">
-              <line className="motion-shin left" x1="48" y1="74" x2="47" y2="87" />
-              <line className="motion-shin right" x1="72" y1="74" x2="73" y2="87" />
-            </g>
+          <g className="muscle-highlight">
+            <ellipse className="chest-muscle" cx="150" cy="103" rx="27" ry="15" />
+            <ellipse className="left-delt" cx="128" cy="99" rx="9" ry="12" />
+            <ellipse className="right-delt" cx="172" cy="99" rx="9" ry="12" />
+            <path className="lat-muscle" d="M130 104 Q115 119 129 134 L141 122 Z" />
+            <path className="lat-muscle right" d="M170 104 Q185 119 171 134 L159 122 Z" />
+            <ellipse className="quad-muscle" cx="127" cy="160" rx="10" ry="20" />
+            <ellipse className="quad-muscle right" cx="173" cy="160" rx="10" ry="20" />
           </g>
         </g>
-        <g className="motion-equipment">
-          <line className="cable-post" x1="98" y1="12" x2="98" y2="86" />
-          <line className="cable-line" x1="98" y1="20" x2="78" y2="44" />
-          <rect className="bench-shape" x="35" y="66" width="50" height="8" rx="3" />
-          <rect className="sled-shape" x="82" y="45" width="20" height="32" rx="4" />
-          <line className="machine-pad" x1="82" y1="62" x2="101" y2="62" />
+        <g className="art-barbell">
+          <line x1="55" y1="132" x2="245" y2="132" />
+          <circle cx="67" cy="132" r="22" />
+          <circle cx="233" cy="132" r="22" />
         </g>
-        <path className="motion-arrow arrow-up" d="M103 69 L103 38 M98 43 L103 38 L108 43" />
-        <path className="motion-arrow arrow-out" d="M60 70 L88 70 M83 65 L88 70 L83 75" />
+        <path className="motion-arrow" d="M286 158 L286 87 M279 96 L286 87 L293 96" />
       </svg>
     </div>
   );
 }
 
-function ExerciseThumb({ exercise, size = "normal" }: { exercise: Exercise; size?: "small" | "normal" | "large" }) {
-  return <ExerciseAnimation exercise={exercise} size={size} />;
+function MuscleMap({ exercise }: { exercise: Exercise }) {
+  const target = exercise.target.toLowerCase();
+  const chest = target.includes("chest");
+  const shoulders = target.includes("delt") || target.includes("shoulder");
+  const back = target.includes("lat") || target.includes("back") || target.includes("trap");
+  const quads = target.includes("quad");
+  const hams = target.includes("hamstring");
+  const glutes = target.includes("glute");
+  const arms = target.includes("biceps") || target.includes("triceps");
+  return (
+    <div className="muscle-map-wrap">
+      {["Front", "Back"].map((side) => (
+        <div className="muscle-figure" key={side}>
+          <span>{side}</span>
+          <svg viewBox="0 0 130 250">
+            <circle cx="65" cy="28" r="20" className="body-base" />
+            <path d="M45 52 Q65 42 85 52 L97 120 Q65 138 33 120 Z" className="body-base" />
+            <path d="M38 62 L15 115 L24 122 L48 82" className="body-base limb-shape" />
+            <path d="M92 62 L115 115 L106 122 L82 82" className="body-base limb-shape" />
+            <path d="M48 122 L38 214 L55 218 L65 140" className="body-base limb-shape" />
+            <path d="M82 122 L92 214 L75 218 L65 140" className="body-base limb-shape" />
+            {side === "Front" && chest ? <ellipse cx="65" cy="75" rx="25" ry="15" className="muscle-hot" /> : null}
+            {shoulders ? <>
+              <ellipse cx="42" cy="68" rx="9" ry="15" className="muscle-hot" />
+              <ellipse cx="88" cy="68" rx="9" ry="15" className="muscle-hot" />
+            </> : null}
+            {back && side === "Back" ? <path d="M43 72 Q65 56 87 72 L82 110 Q65 125 48 110 Z" className="muscle-hot" /> : null}
+            {arms ? <>
+              <ellipse cx="29" cy="96" rx="7" ry="17" className="muscle-hot" />
+              <ellipse cx="101" cy="96" rx="7" ry="17" className="muscle-hot" />
+            </> : null}
+            {quads && side === "Front" ? <>
+              <ellipse cx="51" cy="166" rx="10" ry="28" className="muscle-hot" />
+              <ellipse cx="79" cy="166" rx="10" ry="28" className="muscle-hot" />
+            </> : null}
+            {hams && side === "Back" ? <>
+              <ellipse cx="51" cy="166" rx="10" ry="28" className="muscle-hot" />
+              <ellipse cx="79" cy="166" rx="10" ry="28" className="muscle-hot" />
+            </> : null}
+            {glutes && side === "Back" ? <ellipse cx="65" cy="132" rx="25" ry="16" className="muscle-hot" /> : null}
+          </svg>
+        </div>
+      ))}
+    </div>
+  );
 }
 
-function NavIcon({ type }: { type: Tab }) {
-  if (type === "workout") {
-    return <svg viewBox="0 0 24 24"><path d="M4 9v6M7 7v10M17 7v10M20 9v6M7 12h10" /></svg>;
-  }
-  if (type === "history") {
-    return <svg viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h10" /></svg>;
-  }
-  if (type === "progress") {
-    return <svg viewBox="0 0 24 24"><path d="M4 18l5-6 4 3 7-9M18 6h2v2" /></svg>;
-  }
-  return <svg viewBox="0 0 24 24"><path d="M6 4h12v16H6zM9 8h6M9 12h6M9 16h4" /></svg>;
+function exerciseSteps(exercise: Exercise) {
+  const kind = motionKind(exercise);
+  const common = [
+    "Set your position so the target muscle can move through a comfortable range.",
+    "Control the lowering phase instead of letting the stack or weight drop.",
+    "Drive the weight through the intended path without bouncing or twisting.",
+    "Stop the set with the planned reps in reserve and log the result."
+  ];
+  if (kind === "press") return ["Set shoulder blades against the bench or pad and plant your feet.", "Lower under control until the upper arm reaches a comfortable depth.", "Press up while keeping the shoulders stable.", "Finish with the planned reps in reserve; do not grind every set."];
+  if (kind === "legpress") return ["Set your feet where knees and ankles feel stable.", "Lower the sled under control to your pain-free depth.", "Drive through the whole foot without locking the knees hard.", "Keep your hips against the pad and stop before form changes."];
+  if (kind === "lateral") return ["Set the cable slightly behind or beside you.", "Lead with the elbow and raise the arm out to the side.", "Pause briefly near shoulder height without shrugging.", "Lower slowly and keep tension on the side delt."];
+  return common;
 }
 
-function MiniChart({ values }: { values: number[] }) {
-  if (!values.length) return <div className="empty-chart">Log workouts to build this graph</div>;
+function NavIcon({ tab }: { tab: MainTab }) {
+  if (tab === "program") return <svg viewBox="0 0 24 24"><path d="M4 6h16v14H4zM8 3v6M16 3v6M8 13h8" /></svg>;
+  if (tab === "workout") return <svg viewBox="0 0 24 24"><path d="M5 9v6M8 7v10M16 7v10M19 9v6M8 12h8" /></svg>;
+  if (tab === "progress") return <svg viewBox="0 0 24 24"><path d="M4 18l5-6 4 3 7-9M18 6h2v2" /></svg>;
+  if (tab === "nutrition") return <svg viewBox="0 0 24 24"><path d="M12 3c3 4 5 6 5 10a5 5 0 01-10 0c0-4 2-6 5-10zM8 21h8" /></svg>;
+  return <svg viewBox="0 0 24 24"><path d="M5 6h14M5 12h14M5 18h14" /></svg>;
+}
+
+function LineChart({ values }: { values: number[] }) {
+  if (!values.length) return <div className="chart-empty">Log sessions to build this graph.</div>;
   const min = Math.min(...values);
   const max = Math.max(...values);
   const spread = Math.max(1, max - min);
-  const points = values
-    .map((value, index) => {
-      const x = values.length === 1 ? 50 : (index / (values.length - 1)) * 100;
-      const y = 90 - ((value - min) / spread) * 70;
-      return x + "," + y;
-    })
-    .join(" ");
+  const points = values.map((v, i) => {
+    const x = values.length === 1 ? 50 : (i / (values.length - 1)) * 100;
+    const y = 86 - ((v - min) / spread) * 66;
+    return x + "," + y;
+  }).join(" ");
   return (
-    <svg className="mini-chart" viewBox="0 0 100 100" preserveAspectRatio="none" aria-label="Progress chart">
-      <defs>
-        <linearGradient id="chartFill" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor="rgba(91,124,255,.34)" />
-          <stop offset="100%" stopColor="rgba(91,124,255,0)" />
-        </linearGradient>
-      </defs>
-      <polyline points={points} fill="none" stroke="currentColor" strokeWidth="3" vectorEffect="non-scaling-stroke" />
+    <svg className="line-chart" viewBox="0 0 100 100" preserveAspectRatio="none">
+      <path d="M0 88 H100 M0 66 H100 M0 44 H100 M0 22 H100" className="chart-grid" />
+      <polyline points={points} className="chart-line" vectorEffect="non-scaling-stroke" />
+      {values.map((v, i) => {
+        const x = values.length === 1 ? 50 : (i / (values.length - 1)) * 100;
+        const y = 86 - ((v - min) / spread) * 66;
+        return <circle key={i} cx={x} cy={y} r="1.8" className="chart-point" />;
+      })}
     </svg>
   );
 }
 
 export default function Home() {
-  const [tab, setTab] = useState<Tab>("workout");
+  const [tab, setTab] = useState<MainTab>("program");
+  const [progressTab, setProgressTab] = useState<ProgressTab>("exercises");
+  const [theme, setTheme] = useState<ThemeMode>("system");
+  const [systemTheme, setSystemTheme] = useState<"light" | "dark">("dark");
   const [store, setStore] = useState<AppStore>({ workouts: [], body: [], equipment: defaultEquipment, updatedAt: 0 });
   const [ready, setReady] = useState(false);
   const [selected, setSelected] = useState<Session["id"]>("A");
-  const [previewSessionId, setPreviewSessionId] = useState<Session["id"] | null>(null);
+  const [routineDetail, setRoutineDetail] = useState<Session["id"] | null>(null);
   const [active, setActive] = useState<Workout | null>(null);
   const [startedAt, setStartedAt] = useState<number | null>(null);
   const [clock, setClock] = useState(Date.now());
   const [timer, setTimer] = useState(0);
   const [timerLabel, setTimerLabel] = useState("Rest");
-  const [demoExercise, setDemoExercise] = useState<Exercise | null>(null);
+  const [detailExercise, setDetailExercise] = useState<Exercise | null>(null);
+  const [detailTab, setDetailTab] = useState<ExerciseDetailTab>("animation");
+  const [weightPicker, setWeightPicker] = useState<WeightPickerState>(null);
+  const [customWeight, setCustomWeight] = useState("");
   const [bodyWeight, setBodyWeight] = useState("");
   const [waist, setWaist] = useState("");
   const [shoulders, setShoulders] = useState("");
@@ -369,6 +384,9 @@ export default function Home() {
   const [recoveryInput, setRecoveryInput] = useState("");
   const [syncReady, setSyncReady] = useState(false);
   const [syncStatus, setSyncStatus] = useState<"local" | "checking" | "synced" | "error">("local");
+  const [sound, setSound] = useState(true);
+  const [vibration, setVibration] = useState(true);
+  const [selectedProgressExercise, setSelectedProgressExercise] = useState("leg-press");
 
   useEffect(() => {
     try {
@@ -385,15 +403,16 @@ export default function Home() {
         setStore({
           workouts: parsedWorkouts,
           body: parsed.body || [],
-          equipment: parsed.equipment && parsed.equipment.length ? parsed.equipment : defaultEquipment,
+          equipment: parsed.equipment?.length ? parsed.equipment : defaultEquipment,
           updatedAt: parsed.updatedAt || (parsedWorkouts.length || parsed.body?.length ? Date.now() : 0)
         });
-        const lastCore = [...parsedWorkouts].reverse().find((workout) => workout.completed && workout.sessionId !== "D");
+        const lastCore = [...parsedWorkouts].reverse().find((w) => w.completed && w.sessionId !== "D");
         if (lastCore && (lastCore.sessionId === "A" || lastCore.sessionId === "B" || lastCore.sessionId === "C")) {
           setSelected(nextCoreId(lastCore.sessionId));
         }
       }
-
+      const savedTheme = localStorage.getItem(THEME_KEY) as ThemeMode | null;
+      if (savedTheme) setTheme(savedTheme);
       let recoveryKey = localStorage.getItem(SYNC_KEY_STORAGE) || "";
       if (!recoveryKey) {
         recoveryKey = createRecoveryKey();
@@ -402,28 +421,40 @@ export default function Home() {
       setSyncKey(recoveryKey);
       setRecoveryInput(recoveryKey);
     } catch {}
+    const media = window.matchMedia("(prefers-color-scheme: light)");
+    const apply = () => setSystemTheme(media.matches ? "light" : "dark");
+    apply();
+    media.addEventListener?.("change", apply);
     setReady(true);
+    return () => media.removeEventListener?.("change", apply);
   }, []);
 
   useEffect(() => {
     if (ready) localStorage.setItem(STORAGE_KEY, JSON.stringify(store));
   }, [ready, store]);
+  useEffect(() => {
+    if (ready) localStorage.setItem(THEME_KEY, theme);
+  }, [ready, theme]);
+  useEffect(() => {
+    if (!active || !startedAt) return;
+    const id = window.setInterval(() => setClock(Date.now()), 1000);
+    return () => window.clearInterval(id);
+  }, [active, startedAt]);
+  useEffect(() => {
+    if (timer <= 0) return;
+    const id = window.setInterval(() => setTimer((value) => Math.max(0, value - 1)), 1000);
+    return () => window.clearInterval(id);
+  }, [timer]);
 
   useEffect(() => {
     if (!ready || !syncKey) return;
     let cancelled = false;
     setSyncReady(false);
     setSyncStatus("checking");
-
-    async function initialiseCloud() {
+    (async () => {
       try {
-        const response = await fetch(SYNC_ENDPOINT, {
-          method: "GET",
-          headers: { "x-recovery-key": syncKey }
-        });
-
+        const response = await fetch(SYNC_ENDPOINT, { method: "GET", headers: { "x-recovery-key": syncKey } });
         if (cancelled) return;
-
         if (response.ok) {
           const remote = await response.json() as { payload?: Partial<AppStore>; updatedAt?: number };
           const remoteUpdatedAt = Number(remote.updatedAt || 0);
@@ -448,7 +479,6 @@ export default function Home() {
             body: JSON.stringify({ payload: store, updatedAt: store.updatedAt || Date.now() })
           });
         }
-
         if (!cancelled) {
           setSyncReady(true);
           setSyncStatus("synced");
@@ -456,11 +486,8 @@ export default function Home() {
       } catch {
         if (!cancelled) setSyncStatus("error");
       }
-    }
-
-    initialiseCloud();
+    })();
     return () => { cancelled = true; };
-    // Deliberately re-run only when the recovery identity changes.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ready, syncKey]);
 
@@ -482,477 +509,269 @@ export default function Home() {
     return () => window.clearTimeout(id);
   }, [ready, syncReady, syncKey, store]);
 
-  useEffect(() => {
-    if (!active || !startedAt) return;
-    const id = window.setInterval(() => setClock(Date.now()), 1000);
-    return () => window.clearInterval(id);
-  }, [active, startedAt]);
-
-  useEffect(() => {
-    if (timer <= 0) return;
-    const id = window.setInterval(() => setTimer((value) => (value > 0 ? value - 1 : 0)), 1000);
-    return () => window.clearInterval(id);
-  }, [timer]);
-
+  const resolvedTheme = theme === "system" ? systemTheme : theme;
   const previous = useMemo(() => latestExerciseLogs(store.workouts), [store.workouts]);
-  const dayStrip = useMemo(() => lastDays(14), []);
-  const chosenSession = sessions.find((session) => session.id === selected) || sessions[0];
-  const previewSession = sessions.find((session) => session.id === previewSessionId) || null;
-  const completedThisWeek = store.workouts.filter(
-    (workout) => workout.completed && new Date(workout.date + "T12:00:00").getTime() >= weekStart().getTime()
-  );
-  const requiredThisWeek = new Set(
-    completedThisWeek.filter((workout) => workout.sessionId !== "D").map((workout) => workout.sessionId)
-  ).size;
-  const latestBody = store.body.length ? store.body[store.body.length - 1] : undefined;
+  const currentWeekDays = useMemo(weekDays, []);
+  const chosenSession = sessions.find((s) => s.id === selected) || sessions[0];
+  const routine = sessions.find((s) => s.id === routineDetail) || null;
+  const completedThisWeek = store.workouts.filter((w) => w.completed && new Date(w.date + "T12:00:00").getTime() >= weekStart().getTime());
+  const latestBody = store.body.at(-1);
   const weightRollingValues = useMemo(() => rollingWeightAverage(store.body), [store.body]);
   const latestWeightAverage = weightRollingValues.at(-1);
-  const waistTrendValues = useMemo(
-    () => store.body.filter((entry) => typeof entry.waist === "number").map((entry) => Number(entry.waist)),
-    [store.body]
-  );
-  const totalSets = active ? completedSetCount(active) : 0;
-  const totalVolume = active ? workoutVolume(active) : 0;
-  const elapsedSeconds = active && startedAt ? Math.max(0, Math.floor((clock - startedAt) / 1000)) : 0;
-
-  const workoutsByDate = useMemo(() => {
-    const map: Record<string, string[]> = {};
-    for (const workout of store.workouts) {
-      if (!workout.completed) continue;
-      if (!map[workout.date]) map[workout.date] = [];
-      map[workout.date].push(workout.sessionId);
-    }
-    return map;
-  }, [store.workouts]);
-
-  const uniqueExercises = useMemo(() => {
-    const map = new Map<string, Exercise>();
-    for (const session of sessions) {
-      for (const exercise of session.exercises) {
-        const current = map.get(exercise.id);
-        if (!current) map.set(exercise.id, exercise);
-      }
-    }
-    return [...map.values()];
-  }, []);
-
-  const progressSeries = useMemo(() => {
-    const configs = [
-      { exerciseId: "press", sessionId: "A" as const, label: "Shoulder press", metric: "e1rm" as const },
-      { exerciseId: "leg-press", sessionId: "B" as const, label: "Leg press", metric: "e1rm" as const },
-      { exerciseId: "pulldown", sessionId: "A" as const, label: "Lat pulldown", metric: "e1rm" as const },
-      { exerciseId: "cable-lateral-raise", sessionId: "A" as const, label: "Lateral raise", metric: "fixed-reps" as const }
-    ];
-
-    return configs.map((config) => {
-      const relevant = store.workouts.filter((workout) => workout.completed && workout.sessionId === config.sessionId);
-      if (config.metric === "e1rm") {
-        const values = relevant.flatMap((workout) => {
-          const best = (workout.sets[config.exerciseId] || [])
-            .filter((set) => set.done)
-            .map((set) => epleyEstimate(Number(set.weight), Number(set.reps)))
-            .reduce((max, value) => Math.max(max, value), 0);
-          return best > 0 ? [best] : [];
-        }).slice(-8);
-
-        return {
-          ...config,
-          values,
-          metricLabel: "Estimated 1RM",
-          latestLabel: values.length ? values.at(-1)!.toFixed(1) + " kg e1RM" : "No data yet"
-        };
-      }
-
-      const latestWorkout = [...relevant].reverse().find((workout) =>
-        (workout.sets[config.exerciseId] || []).some((set) => set.done && Number(set.weight) > 0)
-      );
-      const referenceLoad = latestWorkout
-        ? Math.max(...(latestWorkout.sets[config.exerciseId] || []).filter((set) => set.done).map((set) => Number(set.weight) || 0))
-        : 0;
-
-      const values = referenceLoad > 0
-        ? relevant.flatMap((workout) => {
-            const reps = (workout.sets[config.exerciseId] || [])
-              .filter((set) => set.done && Math.abs(Number(set.weight) - referenceLoad) < 0.01)
-              .reduce((max, set) => Math.max(max, Number(set.reps) || 0), 0);
-            return reps > 0 ? [reps] : [];
-          }).slice(-8)
-        : [];
-
-      return {
-        ...config,
-        values,
-        metricLabel: referenceLoad ? "Reps at " + referenceLoad + " kg" : "Fixed-load reps",
-        latestLabel: values.length ? values.at(-1) + " reps @ " + referenceLoad + " kg" : "No data yet"
-      };
-    });
-  }, [store.workouts]);
+  const waistTrendValues = useMemo(() => store.body.filter((e) => typeof e.waist === "number").map((e) => Number(e.waist)), [store.body]);
 
   const actualWeeklyVolume = useMemo(() => {
     const totals: Record<string, number> = {
-      "Upper chest": 0,
-      "Lats": 0,
-      "Upper back": 0,
-      "Lateral delts": 0,
-      "Rear delts": 0,
-      "Upper traps": 0,
-      "Quads": 0,
-      "Hamstrings": 0,
-      "Glutes": 0
+      "Upper chest":0, Lats:0, "Upper back":0, "Lateral delts":0, "Rear delts":0, "Upper traps":0, Quads:0, Hamstrings:0, Glutes:0
     };
-
     for (const workout of store.workouts) {
       if (!workout.completed || new Date(workout.date + "T12:00:00").getTime() < weekStart().getTime()) continue;
       for (const [exerciseId, sets] of Object.entries(workout.sets)) {
-        const groups = DIRECT_VOLUME_GROUPS[exerciseId] || [];
-        const completed = sets.filter((set) => set.done).length;
-        for (const group of groups) totals[group] = (totals[group] || 0) + completed;
+        const count = sets.filter((set) => set.done).length;
+        for (const group of DIRECT_VOLUME_GROUPS[exerciseId] || []) totals[group] += count;
       }
     }
-
     return Object.entries(totals);
   }, [store.workouts]);
 
+  const progressConfigs = [
+    { exerciseId:"press", sessionId:"A" as const, label:"Shoulder Press", metric:"e1rm" as const },
+    { exerciseId:"leg-press", sessionId:"B" as const, label:"Leg Press", metric:"e1rm" as const },
+    { exerciseId:"pulldown", sessionId:"A" as const, label:"Lat Pulldown", metric:"e1rm" as const },
+    { exerciseId:"cable-lateral-raise", sessionId:"A" as const, label:"Cable Lateral Raise", metric:"fixed" as const }
+  ];
+  const progressData = useMemo(() => {
+    return progressConfigs.map((config) => {
+      const relevant = store.workouts.filter((w) => w.completed && w.sessionId === config.sessionId);
+      if (config.metric === "e1rm") {
+        const values = relevant.flatMap((workout) => {
+          const best = (workout.sets[config.exerciseId] || []).filter((s) => s.done)
+            .map((s) => epleyEstimate(Number(s.weight), Number(s.reps)))
+            .reduce((max, value) => Math.max(max, value), 0);
+          return best > 0 ? [best] : [];
+        });
+        return { ...config, values, latest: values.at(-1) || 0, unit:"kg e1RM" };
+      }
+      const last = [...relevant].reverse().find((w) => (w.sets[config.exerciseId] || []).some((s) => s.done && Number(s.weight) > 0));
+      const reference = last ? Math.max(...(last.sets[config.exerciseId] || []).filter((s) => s.done).map((s) => Number(s.weight) || 0)) : 0;
+      const values = reference ? relevant.flatMap((workout) => {
+        const reps = (workout.sets[config.exerciseId] || []).filter((s) => s.done && Math.abs(Number(s.weight) - reference) < .01)
+          .reduce((max, s) => Math.max(max, Number(s.reps) || 0), 0);
+        return reps ? [reps] : [];
+      }) : [];
+      return { ...config, values, latest: values.at(-1) || 0, unit: reference ? "reps @ " + reference + "kg" : "reps" };
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [store.workouts]);
+
+  const selectedProgress = progressData.find((p) => p.exerciseId === selectedProgressExercise) || progressData[0];
+
+  function stampStore(updater: (current: AppStore) => AppStore) {
+    setStore((current) => ({ ...updater(current), updatedAt: Date.now() }));
+  }
   function startWorkout(session: Session) {
     setSelected(session.id);
+    setRoutineDetail(null);
     setActive(emptyWorkout(session));
     setStartedAt(Date.now());
     setClock(Date.now());
-    setPreviewSessionId(null);
     setTab("workout");
-    window.scrollTo({ top: 0, behavior: "smooth" });
+    window.scrollTo({ top:0, behavior:"smooth" });
   }
-
   function updateSet(exerciseId: string, index: number, patch: Partial<SetLog>) {
     setActive((current) => {
       if (!current) return current;
-      const nextSets = current.sets[exerciseId].map((set, setIndex) =>
-        setIndex === index ? { ...set, ...patch } : set
-      );
-      return { ...current, sets: { ...current.sets, [exerciseId]: nextSets } };
+      const next = current.sets[exerciseId].map((set, i) => i === index ? { ...set, ...patch } : set);
+      return { ...current, sets:{ ...current.sets, [exerciseId]:next } };
     });
   }
-
   function addSet(exerciseId: string) {
-    setActive((current) => {
-      if (!current) return current;
-      const next = [...(current.sets[exerciseId] || []), { weight: "", reps: "", rir: "", done: false }];
-      return { ...current, sets: { ...current.sets, [exerciseId]: next } };
-    });
+    setActive((current) => current ? {
+      ...current,
+      sets:{ ...current.sets, [exerciseId]:[...(current.sets[exerciseId] || []), { weight:"", reps:"", rir:"", done:false }] }
+    } : current);
   }
-
-  function removeLastSet(exerciseId: string) {
-    setActive((current) => {
-      if (!current || (current.sets[exerciseId] || []).length <= 1) return current;
-      return {
-        ...current,
-        sets: {
-          ...current.sets,
-          [exerciseId]: current.sets[exerciseId].slice(0, -1)
-        }
-      };
-    });
-  }
-
   function completeSet(exercise: Exercise, index: number) {
     if (!active) return;
     const set = active.sets[exercise.id][index];
-    const nextDone = !set.done;
-    updateSet(exercise.id, index, { done: nextDone });
-    if (nextDone) {
+    const done = !set.done;
+    updateSet(exercise.id, index, { done });
+    if (done) {
       setTimer(exercise.restSec);
       setTimerLabel(exercise.name);
+      if (vibration && navigator.vibrate) navigator.vibrate(35);
     }
   }
-
   function finishWorkout() {
     if (!active) return;
-    const elapsed = startedAt ? Math.max(1, Math.round((Date.now() - startedAt) / 60000)) : undefined;
-    const saved = { ...active, completed: true, durationMin: elapsed };
-    setStore((current) => ({
+    const saved = {
+      ...active,
+      completed:true,
+      durationMin:startedAt ? Math.max(1, Math.round((Date.now() - startedAt) / 60000)) : undefined
+    };
+    stampStore((current) => ({
       ...current,
-      workouts: [...current.workouts.filter((workout) => workout.id !== saved.id), saved],
-      updatedAt: Date.now()
+      workouts:[...current.workouts.filter((w) => w.id !== saved.id), saved]
     }));
-    if (active.sessionId === "A" || active.sessionId === "B" || active.sessionId === "C") {
-      setSelected(nextCoreId(active.sessionId));
-    } else {
-      const lastCore = [...store.workouts].reverse().find((workout) => workout.completed && workout.sessionId !== "D");
-      if (lastCore && (lastCore.sessionId === "A" || lastCore.sessionId === "B" || lastCore.sessionId === "C")) {
-        setSelected(nextCoreId(lastCore.sessionId));
-      }
-    }
+    if (active.sessionId === "A" || active.sessionId === "B" || active.sessionId === "C") setSelected(nextCoreId(active.sessionId));
     setActive(null);
     setStartedAt(null);
     setTimer(0);
-    setTab("history");
+    setTab("progress");
   }
-
   function saveBody() {
-    const value = Number(bodyWeight);
-    if (!Number.isFinite(value) || value <= 0) return;
-    const waistValue = Number(waist);
-    const shouldersValue = Number(shoulders);
-    const armsValue = Number(arms);
-    const thighsValue = Number(thighs);
-    const entry: BodyEntry = {
-      date: isoDate(),
-      weight: value,
-      ...(Number.isFinite(waistValue) && waistValue > 0 ? { waist: waistValue } : {}),
-      ...(Number.isFinite(shouldersValue) && shouldersValue > 0 ? { shoulders: shouldersValue } : {}),
-      ...(Number.isFinite(armsValue) && armsValue > 0 ? { arms: armsValue } : {}),
-      ...(Number.isFinite(thighsValue) && thighsValue > 0 ? { thighs: thighsValue } : {})
+    const weight = Number(bodyWeight);
+    if (!Number.isFinite(weight) || weight <= 0) return;
+    const optional = (value:string) => {
+      const n = Number(value);
+      return Number.isFinite(n) && n > 0 ? n : undefined;
     };
-    setStore((current) => ({ ...current, body: [...current.body, entry], updatedAt: Date.now() }));
-    setBodyWeight("");
-    setWaist("");
-    setShoulders("");
-    setArms("");
-    setThighs("");
+    const entry: BodyEntry = {
+      date:isoDate(), weight,
+      waist:optional(waist), shoulders:optional(shoulders), arms:optional(arms), thighs:optional(thighs)
+    };
+    stampStore((current) => ({ ...current, body:[...current.body, entry] }));
+    setBodyWeight(""); setWaist(""); setShoulders(""); setArms(""); setThighs("");
   }
-
-  function toggleEquipment(item: Equipment) {
-    setStore((current) => {
-      const has = current.equipment.includes(item);
-      return {
-        ...current,
-        equipment: has
-          ? current.equipment.filter((value) => value !== item)
-          : [...current.equipment, item],
-        updatedAt: Date.now()
-      };
-    });
+  function applyWeight(value:number) {
+    if (!weightPicker) return;
+    updateSet(weightPicker.exerciseId, weightPicker.index, { weight:String(Math.max(0, Math.round(value * 100) / 100)) });
+    setWeightPicker(null);
+    setCustomWeight("");
   }
-
-  function deleteWorkout(id: string) {
-    if (!window.confirm("Delete this logged workout?")) return;
-    setStore((current) => ({
-      ...current,
-      workouts: current.workouts.filter((workout) => workout.id !== id),
-      updatedAt: Date.now()
-    }));
-  }
-
   function useRecoveryKey() {
     const value = recoveryInput.trim();
-    if (!/^[A-Za-z0-9_-]{40,100}$/.test(value)) {
-      setSyncStatus("error");
-      return;
-    }
+    if (!/^[A-Za-z0-9_-]{40,100}$/.test(value)) { setSyncStatus("error"); return; }
     localStorage.setItem(SYNC_KEY_STORAGE, value);
     setSyncReady(false);
     setSyncKey(value);
   }
 
-  async function copyRecoveryKey() {
-    try {
-      await navigator.clipboard.writeText(syncKey);
-    } catch {}
-  }
+  if (!ready) return <main className="loading-screen"><strong>Carry the Boats</strong><span>Loading…</span></main>;
 
-  function openDemo(exercise: Exercise) {
-    setDemoExercise(exercise);
-  }
+  const elapsed = active && startedAt ? Math.max(0, Math.floor((clock - startedAt) / 1000)) : 0;
+  const completedSets = active ? completedSetCount(active) : 0;
+  const liveVolume = active ? workoutVolume(active) : 0;
 
-  if (!ready) {
+  if (routine && !active) {
     return (
-      <main className="loading-screen">
-        <div className="loading-logo">CTB</div>
-        <span>Loading workouts…</span>
+      <main className="ctb-app" data-theme={resolvedTheme}>
+        <section className="phone-screen routine-detail-screen">
+          <header className="detail-header">
+            <button onClick={() => setRoutineDetail(null)}>‹</button>
+            <button className="icon-button">⚙</button>
+          </header>
+          <div className="routine-title-block">
+            <h1>{routine.id}. {routine.title}</h1>
+            <p>{routine.duration} · {routine.exercises.length} exercises</p>
+          </div>
+          <div className="routine-exercise-list">
+            {routine.exercises.map((exercise, index) => (
+              <button className="routine-exercise-row" key={exercise.id + index} onClick={() => { setDetailExercise(exercise); setDetailTab("animation"); }}>
+                <span className="exercise-order">{index + 1}</span>
+                <ExerciseArt exercise={exercise} compact />
+                <span className="routine-exercise-copy">
+                  <strong>{exercise.name}</strong>
+                  <small>{exercise.target}</small>
+                  <em>{exercise.sets} × {exercise.reps}</em>
+                </span>
+              </button>
+            ))}
+          </div>
+          <div className="sticky-start"><Button className="primary" onClick={() => startWorkout(routine)}>Start Workout</Button></div>
+        </section>
+        {detailExercise ? (
+          <ExerciseDetailModal exercise={detailExercise} tab={detailTab} setTab={setDetailTab} onClose={() => setDetailExercise(null)} />
+        ) : null}
       </main>
     );
   }
 
   if (active) {
-    const activeSession = sessions.find((session) => session.id === active.sessionId) || sessions[0];
+    const session = sessions.find((s) => s.id === active.sessionId) || sessions[0];
     return (
-      <main className="hevy-app live-app">
-        <header className="live-header">
-          <button
-            className="text-button"
-            onClick={() => {
-              if (totalSets === 0 || window.confirm("Discard this unfinished workout?")) {
-                setActive(null);
-                setStartedAt(null);
-                setTimer(0);
-              }
-            }}
-          >
-            Cancel
-          </button>
-          <div className="live-title">
-            <strong>{activeSession.title}</strong>
-            <span>{formatDuration(elapsedSeconds)}</span>
+      <main className="ctb-app" data-theme={resolvedTheme}>
+        <section className="phone-screen active-workout-screen">
+          <header className="workout-header">
+            <button onClick={() => { if (completedSets === 0 || confirm("Discard this workout?")) setActive(null); }}>‹</button>
+            <div><strong>Log Workout</strong><span>⌄</span></div>
+            <Button className="finish-mini" disabled={!completedSets} onClick={finishWorkout}>Finish</Button>
+          </header>
+          <div className="workout-stats">
+            <div><span>Time</span><strong>{formatDuration(elapsed)}</strong></div>
+            <div><span>Volume</span><strong>{liveVolume.toLocaleString()} kg</strong></div>
+            <div><span>Sets</span><strong>{completedSets}</strong></div>
           </div>
-          <Button className="finish-button" disabled={totalSets === 0} onClick={finishWorkout}>
-            Finish
-          </Button>
-        </header>
 
-        <section className="live-summary">
-          <div><strong>{formatDuration(elapsedSeconds)}</strong><span>Duration</span></div>
-          <div><strong>{totalVolume.toLocaleString()} kg</strong><span>Volume</span></div>
-          <div><strong>{totalSets}</strong><span>Sets</span></div>
-        </section>
-
-        {active.sessionId === "D" ? (
-          <div className="workout-alert">
-            <strong>Optional volume</strong>
-            <span>Keep this easy enough that it never compromises your next core workout or boxing recovery.</span>
-          </div>
-        ) : null}
-
-        <section className="live-exercises">
-          {activeSession.exercises.map((exercise) => {
-            const prev = previous[active.sessionId + ":" + exercise.id];
-            const available = equipmentMatch(exercise, store.equipment);
-            return (
-              <article className="live-exercise" key={exercise.id}>
-                <div className="exercise-header">
-                  <button className="thumb-button" onClick={() => openDemo(exercise)} aria-label={"View " + exercise.name + " demo"}>
-                    <ExerciseThumb exercise={exercise} />
-                    <span className="play-badge">▶</span>
+          <div className="workout-exercises">
+            {session.exercises.map((exercise) => {
+              const prev = previous[active.sessionId + ":" + exercise.id];
+              return (
+                <article className="workout-exercise-card" key={exercise.id}>
+                  <div className="workout-exercise-title">
+                    <button className="mini-art-button" onClick={() => { setDetailExercise(exercise); setDetailTab("animation"); }}><ExerciseArt exercise={exercise} compact /></button>
+                    <div><strong>{exercise.name}</strong><span>{exercise.target}</span></div>
+                    <button className="dots">⋮</button>
+                  </div>
+                  <button className="hero-animation" onClick={() => { setDetailExercise(exercise); setDetailTab("animation"); }}>
+                    <ExerciseArt exercise={exercise} />
+                    <span className="expand-badge">⛶</span>
                   </button>
-                  <div className="exercise-heading-copy">
-                    <h2>{exercise.name}</h2>
-                    <button className="exercise-link" onClick={() => openDemo(exercise)}>
-                      {exercise.target} · View exercise
-                    </button>
+                  <div className="rest-chip">◷ Rest Timer: {secsToClock(exercise.restSec)}</div>
+                  <div className="coach-line"><strong>Next:</strong> {progressionAdvice(exercise, prev)}</div>
+                  {!equipmentMatch(exercise, store.equipment) ? <div className="equipment-warning">Alternative: {exercise.alternatives.slice(0,2).join(" · ")}</div> : null}
+
+                  <div className="set-grid set-head">
+                    <span>SET</span><span>PREVIOUS</span><span>KG</span><span>REPS</span><span>RIR</span><span>✓</span>
                   </div>
-                  <button className="more-button" onClick={() => openDemo(exercise)} aria-label="Exercise options">•••</button>
-                </div>
+                  {(active.sets[exercise.id] || []).map((set, index) => {
+                    const old = prev?.[index];
+                    const oldText = old ? ((old.weight || "—") + " × " + (old.reps || "—")) : "—";
+                    return (
+                      <div className={"set-grid set-row " + (set.done ? "done" : "")} key={index}>
+                        <span className="set-index">{index + 1}</span>
+                        <span className="previous-set">{oldText}</span>
+                        <button className="weight-cell" onClick={() => setWeightPicker({ exerciseId:exercise.id, index, exerciseName:exercise.name })}>{set.weight || old?.weight || "—"}</button>
+                        <input inputMode="numeric" value={set.reps} placeholder={old?.reps || String(exercise.minRep)} onChange={(e) => updateSet(exercise.id,index,{reps:e.target.value})} />
+                        <select value={set.rir} onChange={(e) => updateSet(exercise.id,index,{rir:e.target.value})}><option value="">2</option><option>3</option><option>2</option><option>1</option><option>0</option></select>
+                        <button className="set-check" onClick={() => completeSet(exercise,index)}>✓</button>
+                      </div>
+                    );
+                  })}
+                  <button className="add-set" onClick={() => addSet(exercise.id)}>＋ Add Set</button>
+                </article>
+              );
+            })}
+          </div>
 
-                <div className="routine-note">
-                  <span>Coach</span>
-                  <p>{exercise.cue}</p>
-                </div>
-
-                <div className="progression-callout">
-                  <strong>Next target</strong>
-                  <span>{progressionAdvice(exercise, prev)}</span>
-                </div>
-
-                {!available ? (
-                  <div className="swap-callout">
-                    <strong>Equipment not selected</strong>
-                    <span>{exercise.alternatives.slice(0, 3).join(" · ")}</span>
-                  </div>
-                ) : null}
-
-                <div className="sets-grid set-labels">
-                  <span>SET</span>
-                  <span>PREVIOUS</span>
-                  <span>KG</span>
-                  <span>REPS</span>
-                  <span>RIR</span>
-                  <span />
-                </div>
-
-                {(active.sets[exercise.id] || []).map((set, index) => {
-                  const old = prev?.[index];
-                  const oldText = old?.weight
-                    ? old.weight + " × " + (old.reps || "–")
-                    : old?.reps
-                      ? old.reps + " reps"
-                      : "—";
-                  return (
-                    <div className={set.done ? "sets-grid set-line is-done" : "sets-grid set-line"} key={index}>
-                      <button className="set-type">{index + 1}</button>
-                      <span className="previous-value">{oldText}</span>
-                      <input
-                        inputMode="decimal"
-                        value={set.weight}
-                        placeholder={old?.weight || "0"}
-                        onChange={(event) => updateSet(exercise.id, index, { weight: event.target.value })}
-                        aria-label={exercise.name + " set " + (index + 1) + " weight"}
-                      />
-                      <input
-                        inputMode="numeric"
-                        value={set.reps}
-                        placeholder={old?.reps || String(exercise.minRep)}
-                        onChange={(event) => updateSet(exercise.id, index, { reps: event.target.value })}
-                        aria-label={exercise.name + " set " + (index + 1) + " reps"}
-                      />
-                      <input
-                        inputMode="numeric"
-                        value={set.rir}
-                        placeholder="2"
-                        onChange={(event) => updateSet(exercise.id, index, { rir: event.target.value })}
-                        aria-label={exercise.name + " set " + (index + 1) + " reps in reserve"}
-                      />
-                      <button
-                        className={set.done ? "set-check checked" : "set-check"}
-                        onClick={() => completeSet(exercise, index)}
-                        aria-label={"Complete " + exercise.name + " set " + (index + 1)}
-                      >
-                        ✓
-                      </button>
-                    </div>
-                  );
-                })}
-
-                <div className="set-actions">
-                  <button onClick={() => addSet(exercise.id)}>+ Add set</button>
-                  {(active.sets[exercise.id] || []).length > 1 ? (
-                    <button className="secondary-set-action" onClick={() => removeLastSet(exercise.id)}>Remove last</button>
-                  ) : null}
-                </div>
-
-                <details className="exercise-details">
-                  <summary>Alternatives & why</summary>
-                  <p>{exercise.why}</p>
-                  <strong>Swap with:</strong>
-                  <p>{exercise.alternatives.join(" · ")}</p>
-                  <small>Use a swap that preserves the target muscle while reducing unavailable equipment, balance demand, or joint irritation.</small>
-                </details>
-              </article>
-            );
-          })}
-        </section>
-
-        <section className="workout-notes-card">
-          <label htmlFor="workout-notes">Workout notes</label>
-          <textarea
-            id="workout-notes"
-            value={active.notes}
-            onChange={(event) => setActive((current) => current ? { ...current, notes: event.target.value } : current)}
-            placeholder="Energy, pain, setup changes, wins…"
-          />
-        </section>
-
-        <div className="live-finish-zone">
-          <Button className="large-finish" disabled={totalSets === 0} onClick={finishWorkout}>
-            Finish workout
-          </Button>
-        </div>
-
-        {timer > 0 ? (
-          <aside className="rest-bar">
-            <button onClick={() => setTimer(Math.max(0, timer - 15))}>−15</button>
-            <div>
-              <span>{timerLabel}</span>
-              <strong>{secsToClock(timer)}</strong>
+          {timer > 0 ? (
+            <div className="floating-timer">
+              <button onClick={() => setTimer(Math.max(0,timer-15))}>−15</button>
+              <div><span>{timerLabel}</span><strong>{secsToClock(timer)}</strong></div>
+              <button onClick={() => setTimer(timer+15)}>+15</button>
+              <button onClick={() => setTimer(0)}>Skip</button>
             </div>
-            <button onClick={() => setTimer(timer + 15)}>+15</button>
-            <button className="skip-rest" onClick={() => setTimer(0)}>Skip</button>
-          </aside>
-        ) : null}
+          ) : null}
+        </section>
 
-        {demoExercise ? (
-          <div className="modal-backdrop" onClick={() => setDemoExercise(null)}>
-            <div className="demo-modal" onClick={(event) => event.stopPropagation()}>
-              <div className="modal-head">
-                <div>
-                  <strong>{demoExercise.name}</strong>
-                  <span>{demoExercise.target}</span>
-                </div>
-                <button onClick={() => setDemoExercise(null)}>✕</button>
+        {detailExercise ? <ExerciseDetailModal exercise={detailExercise} tab={detailTab} setTab={setDetailTab} onClose={() => setDetailExercise(null)} /> : null}
+        {weightPicker ? (
+          <div className="modal-backdrop" onClick={() => setWeightPicker(null)}>
+            <div className="weight-picker" onClick={(e) => e.stopPropagation()}>
+              <div className="picker-header"><strong>Select Weight</strong><button onClick={() => setWeightPicker(null)}>✕</button></div>
+              <div className="current-weight">{active.sets[weightPicker.exerciseId]?.[weightPicker.index]?.weight || "0"}<small>kg</small></div>
+              <div className="weight-adjust">
+                {[-2.5,-1.25,1.25,2.5].map((inc) => (
+                  <button key={inc} onClick={() => {
+                    const current = Number(active.sets[weightPicker.exerciseId]?.[weightPicker.index]?.weight || 0);
+                    applyWeight(current + inc);
+                  }}>{inc > 0 ? "+" : ""}{inc}</button>
+                ))}
               </div>
-              <div className="animation-stage">
-                <ExerciseAnimation exercise={demoExercise} size="large" />
+              <div className="weight-grid">
+                {WEIGHT_OPTIONS.map((w) => <button className={Number(active.sets[weightPicker.exerciseId]?.[weightPicker.index]?.weight) === w ? "selected" : ""} key={w} onClick={() => applyWeight(w)}>{w}</button>)}
               </div>
-              <p className="demo-cue">{demoExercise.cue}</p>
-              <div className="guide-link static-guide">Built-in looping movement guide</div>
+              <div className="custom-weight-row"><input inputMode="decimal" value={customWeight} onChange={(e) => setCustomWeight(e.target.value)} placeholder="Custom weight" /><Button className="primary" onClick={() => applyWeight(Number(customWeight) || 0)}>Set</Button></div>
             </div>
           </div>
         ) : null}
@@ -961,488 +780,190 @@ export default function Home() {
   }
 
   return (
-    <main className="hevy-app">
-      <header className="app-topbar">
-        <div>
-          <span className="app-kicker">CARRY THE BOATS</span>
-          <h1>{tab === "workout" ? "Workout" : tab === "history" ? "History" : tab === "progress" ? "Progress" : "Program"}</h1>
-        </div>
-        <div className="profile-dot">UN</div>
-      </header>
-
-      <div className="app-content">
-        {tab === "workout" ? (
-          <section className="tab-page workout-page">
-            <div className="week-card">
-              <div>
-                <span>This week</span>
-                <strong>{requiredThisWeek} of 3 core workouts</strong>
-              </div>
-              <div className="week-dots">
-                {[0, 1, 2].map((index) => (
-                  <i className={index < requiredThisWeek ? "filled" : ""} key={index}>
-                    {index < requiredThisWeek ? "✓" : index + 1}
-                  </i>
-                ))}
-                <i className={completedThisWeek.some((workout) => workout.sessionId === "D") ? "bonus filled" : "bonus"}>D</i>
-              </div>
-            </div>
-
-            <article className="next-routine-card">
-              <div className="next-label">RECOMMENDED NEXT</div>
-              <div className="next-routine-main">
-                <div>
-                  <span className="routine-letter">{chosenSession.id}</span>
-                  <h2>{chosenSession.title}</h2>
-                  <p>{chosenSession.duration} · {chosenSession.exercises.length} exercises</p>
-                </div>
-                <Button className="blue-button" onClick={() => startWorkout(chosenSession)}>Start routine</Button>
-              </div>
-              <div className="mini-exercise-row">
-                {chosenSession.exercises.slice(0, 4).map((exercise) => (
-                  <button key={exercise.id} onClick={() => openDemo(exercise)}>
-                    <ExerciseThumb exercise={exercise} size="small" />
-                    <span>{exercise.name}</span>
-                  </button>
-                ))}
-              </div>
-            </article>
-
-            <div className="section-title-row">
-              <div>
-                <h2>My routines</h2>
-                <span>Science-built for your goals</span>
-              </div>
-              <span className="routine-count">{sessions.length}</span>
-            </div>
-
-            <div className="routine-list">
-              {sessions.map((session) => (
-                <article className="routine-card" key={session.id}>
-                  <button className="routine-card-main" onClick={() => setPreviewSessionId(session.id)}>
-                    <div className="routine-card-head">
-                      <div>
-                        <span className={session.required ? "routine-letter" : "routine-letter optional"}>{session.id}</span>
-                        <div>
-                          <h3>{session.title}</h3>
-                          <p>{session.required ? "Core routine" : "Optional"} · {session.duration}</p>
-                        </div>
-                      </div>
-                      <span className="chevron">›</span>
-                    </div>
-                    <div className="routine-preview-list">
-                      {session.exercises.slice(0, 4).map((exercise) => (
-                        <div className="routine-preview-exercise" key={exercise.id}>
-                          <ExerciseThumb exercise={exercise} size="small" />
-                          <div>
-                            <strong>{exercise.name}</strong>
-                            <span>{exercise.sets} sets · {exercise.reps}</span>
-                          </div>
-                        </div>
-                      ))}
-                      {session.exercises.length > 4 ? (
-                        <span className="more-exercises">+{session.exercises.length - 4} more exercises</span>
-                      ) : null}
-                    </div>
-                  </button>
-                  <Button className="routine-start" onClick={() => startWorkout(session)}>Start routine</Button>
-                </article>
-              ))}
-            </div>
-
-            <div className="hevy-reference-note">
-              <strong>Built for gym speed</strong>
-              <span>Routines are reusable templates. Starting one turns it into a live workout where you log each set, just like the workflow popularized by Hevy.</span>
-            </div>
-          </section>
-        ) : null}
-
-        {tab === "history" ? (
-          <section className="tab-page">
-            <div className="calendar-strip">
-              {dayStrip.map((day) => {
-                const entries = workoutsByDate[day.date] || [];
-                return (
-                  <div className={day.date === isoDate() ? "cal-day today" : "cal-day"} key={day.date}>
-                    <span>{day.weekday}</span>
-                    <strong>{day.day}</strong>
-                    <div>{entries.map((entry, index) => <i key={entry + index}>{entry}</i>)}</div>
-                  </div>
-                );
-              })}
-            </div>
-
-            <div className="section-title-row history-title">
-              <div>
-                <h2>Recent workouts</h2>
-                <span>{store.workouts.length} logged sessions</span>
-              </div>
-            </div>
-
-            <div className="history-list">
-              {[...store.workouts].reverse().map((workout) => {
-                const session = sessions.find((item) => item.id === workout.sessionId) || sessions[0];
-                return (
-                  <article className="history-card" key={workout.id}>
-                    <div className="history-head">
-                      <div className="routine-letter">{workout.sessionId}</div>
-                      <div>
-                        <h3>{session.title}</h3>
-                        <p>{new Date(workout.date + "T12:00:00").toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "short" })}</p>
-                      </div>
-                      <button onClick={() => deleteWorkout(workout.id)}>•••</button>
-                    </div>
-                    <div className="history-stats">
-                      <div><span>Duration</span><strong>{workout.durationMin ? workout.durationMin + " min" : "—"}</strong></div>
-                      <div><span>Volume</span><strong>{workoutVolume(workout).toLocaleString()} kg</strong></div>
-                      <div><span>Sets</span><strong>{completedSetCount(workout)}</strong></div>
-                    </div>
-                    <div className="history-exercises">
-                      {session.exercises.slice(0, 4).map((exercise) => {
-                        const done = (workout.sets[exercise.id] || []).filter((set) => set.done);
-                        const best = done.reduce<{ weight: number; reps: number } | null>((result, set) => {
-                          const weight = Number(set.weight) || 0;
-                          const reps = Number(set.reps) || 0;
-                          if (!result || weight > result.weight) return { weight, reps };
-                          return result;
-                        }, null);
-                        return (
-                          <div key={exercise.id}>
-                            <ExerciseThumb exercise={exercise} size="small" />
-                            <span>{exercise.name}</span>
-                            <strong>{best && best.weight > 0 ? best.weight + " kg × " + best.reps : done.length + " sets"}</strong>
-                          </div>
-                        );
-                      })}
-                    </div>
-                    <Button className="repeat-button" onClick={() => startWorkout(session)}>Repeat workout</Button>
-                  </article>
-                );
-              })}
-              {!store.workouts.length ? (
-                <div className="empty-state">
-                  <div className="empty-icon">✓</div>
-                  <h3>No workouts yet</h3>
-                  <p>Start Session {selected}. Your full workout will appear here after you finish.</p>
-                  <Button className="blue-button" onClick={() => startWorkout(chosenSession)}>Start Session {selected}</Button>
-                </div>
-              ) : null}
-            </div>
-          </section>
-        ) : null}
-
-        {tab === "progress" ? (
-          <section className="tab-page">
-            <div className="progress-overview">
-              <div><span>This week</span><strong>{completedThisWeek.length}</strong><small>workouts</small></div>
-              <div><span>7-day avg</span><strong>{latestWeightAverage ? latestWeightAverage.toFixed(1) : "—"}</strong><small>{latestWeightAverage ? "kg" : "not logged"}</small></div>
-              <div><span>Total sessions</span><strong>{store.workouts.length}</strong><small>all time</small></div>
-            </div>
-
-            <div className="section-title-row">
-              <div>
-                <h2>Exercise progress</h2>
-                <span>Session-scoped e1RM or fixed-load reps</span>
-              </div>
-            </div>
-
-            <div className="progress-card-grid">
-              {progressSeries.map((series) => (
-                <article className="progress-card" key={series.sessionId + ":" + series.exerciseId}>
-                  <div className="progress-card-head">
-                    <div>
-                      <span>{series.label} · Session {series.sessionId}</span>
-                      <strong>{series.latestLabel}</strong>
-                      <small>{series.metricLabel}</small>
-                    </div>
-                    <span className="chart-period">LAST 8</span>
-                  </div>
-                  <MiniChart values={series.values} />
-                </article>
-              ))}
-            </div>
-
-            <article className="body-card">
-              <div className="section-title-row compact">
-                <div>
-                  <h2>Body measurements</h2>
-                  <span>Track the trend, not one day</span>
-                </div>
-              </div>
-              <div className="body-trend-grid">
-                <div className="body-trend-card">
-                  <div><span>Bodyweight trend</span><strong>{latestWeightAverage ? latestWeightAverage.toFixed(1) + " kg" : "No data"}</strong></div>
-                  <MiniChart values={weightRollingValues.slice(-14)} />
-                  <small>7-day rolling average</small>
-                </div>
-                <div className="body-trend-card">
-                  <div><span>Waist trend</span><strong>{latestBody?.waist ? latestBody.waist + " cm" : "No data"}</strong></div>
-                  <MiniChart values={waistTrendValues.slice(-14)} />
-                  <small>Waist flat/down while strength rises is a useful recomp signal.</small>
-                </div>
-              </div>
-              <div className="body-inputs">
-                <label>
-                  Weight (kg)
-                  <input value={bodyWeight} inputMode="decimal" onChange={(event) => setBodyWeight(event.target.value)} placeholder="100.0" />
-                </label>
-                <label>
-                  Waist (cm)
-                  <input value={waist} inputMode="decimal" onChange={(event) => setWaist(event.target.value)} placeholder="optional" />
-                </label>
-                <label>
-                  Shoulders (cm)
-                  <input value={shoulders} inputMode="decimal" onChange={(event) => setShoulders(event.target.value)} placeholder="optional" />
-                </label>
-                <label>
-                  Arms (cm)
-                  <input value={arms} inputMode="decimal" onChange={(event) => setArms(event.target.value)} placeholder="optional" />
-                </label>
-                <label>
-                  Thighs (cm)
-                  <input value={thighs} inputMode="decimal" onChange={(event) => setThighs(event.target.value)} placeholder="optional" />
-                </label>
-                <Button className="blue-button" onClick={saveBody}>Log measurement</Button>
-              </div>
-              <div className="measurement-history">
-                {[...store.body].reverse().slice(0, 8).map((entry) => (
-                  <div className="measurement-row" key={entry.date + entry.weight + String(entry.waist || "")}>
-                    <span>{entry.date}</span>
-                    <strong>{entry.weight} kg</strong>
-                    <small>
-                      {[
-                        entry.waist ? "Waist " + entry.waist : "",
-                        entry.shoulders ? "Shoulders " + entry.shoulders : "",
-                        entry.arms ? "Arms " + entry.arms : "",
-                        entry.thighs ? "Thighs " + entry.thighs : ""
-                      ].filter(Boolean).join(" · ")}
-                    </small>
-                  </div>
-                ))}
-              </div>
-            </article>
-
-            <article className="volume-card">
-              <div className="section-title-row compact">
-                <div>
-                  <h2>Completed volume this week</h2>
-                  <span>Direct working sets you actually logged</span>
-                </div>
-              </div>
-              <div className="volume-bars">
-                {actualWeeklyVolume.map(([muscle, sets]) => (
-                  <div key={muscle}>
-                    <div>
-                      <span>{muscle}</span>
-                      <strong>{sets} / {VOLUME_REFERENCE_SETS} sets</strong>
-                    </div>
-                    <i><b style={{ width: Math.min(100, (sets / VOLUME_REFERENCE_SETS) * 100) + "%" }} /></i>
-                  </div>
-                ))}
-              </div>
-              <p className="volume-note">
-                The 10-set marker is a hypertrophy-volume reference, not a pass/fail threshold. Direct sets are counted conservatively; compound overlap is not double-counted.
-              </p>
-            </article>
-          </section>
-        ) : null}
-
+    <main className="ctb-app" data-theme={resolvedTheme}>
+      <section className="phone-screen main-screen">
         {tab === "program" ? (
-          <section className="tab-page">
-            <article className="program-intro">
-              <span className="app-kicker">YOUR PROGRAM</span>
-              <h2>Built to grow muscle without wasting recovery.</h2>
-              <p>Stable movements, enough hard weekly sets, measurable progression, and joint-aware substitutions. The science supports the system; the workout screen keeps it simple.</p>
-            </article>
-
-            <div className="section-title-row">
-              <div>
-                <h2>Exercise demos</h2>
-                <span>Tap any movement before you train it</span>
-              </div>
+          <>
+            <header className="brand-header"><h1>Carry the Boats</h1><button className="profile-avatar">UN</button></header>
+            <div className="week-strip">
+              {currentWeekDays.map((d) => <div className={d.today ? "today" : ""} key={d.date}><span>{d.label}</span><strong>{d.day}</strong></div>)}
             </div>
-            <div className="demo-library">
-              {uniqueExercises.slice(0, 12).map((exercise) => (
-                <button key={exercise.id} onClick={() => openDemo(exercise)}>
-                  <ExerciseThumb exercise={exercise} size="large" />
-                  <strong>{exercise.name}</strong>
-                  <span>{exercise.target}</span>
-                  <i>Motion demo</i>
+            <div className="screen-heading"><h2>Your Program</h2><p>3–4 gym sessions per week</p></div>
+            <div className="program-list">
+              {sessions.map((session) => (
+                <button className="program-card" key={session.id} onClick={() => setRoutineDetail(session.id)}>
+                  <span className="program-letter">{session.id}</span>
+                  <span className="program-copy"><strong>{session.title}</strong><small>{session.exercises.length} exercises · {session.duration}</small></span>
+                  <ExerciseArt exercise={session.exercises[0]} compact />
                 </button>
               ))}
             </div>
-
-            <article className="program-panel">
-              <h3>Example week around boxing</h3>
-              <div className="weekly-schedule">
-                {exampleWeek.map(([day, work]) => (
-                  <div key={day}><strong>{day}</strong><span>{work}</span></div>
-                ))}
-              </div>
-            </article>
-
-            <article className="program-panel">
-              <h3>Why the program works</h3>
-              <div className="principles-list">
-                {principles.map(([title, text]) => (
-                  <div key={title}><strong>{title}</strong><p>{text}</p></div>
-                ))}
-              </div>
-            </article>
-
-            <article className="program-panel">
-              <h3>Your gym equipment</h3>
-              <p className="panel-copy">Select what is actually available. Missing equipment gets flagged during the workout with targeted alternatives.</p>
-              <div className="equipment-grid">
-                {allEquipment.map((item) => {
-                  const checked = store.equipment.includes(item);
-                  return (
-                    <button className={checked ? "equipment-pill selected" : "equipment-pill"} key={item} onClick={() => toggleEquipment(item)}>
-                      <span>{checked ? "✓" : "+"}</span>{item}
-                    </button>
-                  );
-                })}
-              </div>
-            </article>
-
-            <article className="program-panel">
-              <h3>Food that fits real life</h3>
-              <div className="meal-list">
-                {mealIdeas.map((meal) => <div key={meal}>{meal}</div>)}
-              </div>
-              <p className="panel-copy">Protein is the anchor. Egusi, rice, stew and Nigerian meals stay in the plan; portions and protein density matter more than eating “fitness foods.”</p>
-            </article>
-
-            <article className="program-panel">
-              <h3>Evidence</h3>
-              <div className="evidence-list">
-                {science.map((item) => (
-                  <a href={item.url} target="_blank" rel="noreferrer" key={item.title}>
-                    <div><strong>{item.title}</strong><p>{item.text}</p></div><span>↗</span>
-                  </a>
-                ))}
-              </div>
-            </article>
-
-            <article className="program-panel data-panel">
-              <div className="sync-title-row">
-                <div>
-                  <h3>Cloud backup</h3>
-                  <p className="panel-copy">Local logging stays instant, while a private Supabase snapshot protects you from browser-storage cleanup.</p>
-                </div>
-                <span className={"sync-status " + syncStatus}>
-                  {syncStatus === "synced" ? "Synced" : syncStatus === "checking" ? "Syncing…" : syncStatus === "error" ? "Sync issue" : "Local"}
-                </span>
-              </div>
-
-              <div className="recovery-key-card">
-                <span>Recovery key</span>
-                <code>{syncKey || "Generating…"}</code>
-                <p>Save this somewhere private. On a new device—or after Safari clears site data—enter it below to restore the cloud copy.</p>
-                <Button className="secondary-button" onClick={copyRecoveryKey}>Copy recovery key</Button>
-              </div>
-
-              <div className="restore-row">
-                <input
-                  value={recoveryInput}
-                  onChange={(event) => setRecoveryInput(event.target.value)}
-                  placeholder="Paste recovery key"
-                  aria-label="Recovery key"
-                />
-                <Button className="blue-button" onClick={useRecoveryKey}>Use & restore</Button>
-              </div>
-
-              <Button
-                className="secondary-button export-button"
-                onClick={() => {
-                  const blob = new Blob([JSON.stringify(store, null, 2)], { type: "application/json" });
-                  const url = URL.createObjectURL(blob);
-                  const anchor = document.createElement("a");
-                  anchor.href = url;
-                  anchor.download = "carry-the-boats-" + isoDate() + ".json";
-                  anchor.click();
-                  URL.revokeObjectURL(url);
-                }}
-              >
-                Export JSON backup
-              </Button>
-            </article>
-          </section>
+            <div className="next-workout-card">
+              <div><span>Recommended next</span><strong>Session {selected}: {chosenSession.title}</strong><small>{chosenSession.duration}</small></div>
+              <Button className="primary" onClick={() => startWorkout(chosenSession)}>Start</Button>
+            </div>
+          </>
         ) : null}
-      </div>
 
-      <nav className="bottom-nav" aria-label="Primary navigation">
-        {([
-          ["workout", "Workout"],
-          ["history", "History"],
-          ["progress", "Progress"],
-          ["program", "Program"]
-        ] as [Tab, string][]).map(([id, label]) => (
-          <button className={tab === id ? "active" : ""} onClick={() => setTab(id)} key={id}>
-            <NavIcon type={id} />
-            <span>{label}</span>
-          </button>
-        ))}
-      </nav>
+        {tab === "workout" ? (
+          <>
+            <header className="simple-header"><h1>Workout</h1><button onClick={() => setTab("program")}>Program</button></header>
+            <div className="quick-start-card">
+              <span>NEXT ROUTINE</span>
+              <h2>{selected}. {chosenSession.title}</h2>
+              <p>{chosenSession.exercises.length} exercises · {chosenSession.duration}</p>
+              <ExerciseArt exercise={chosenSession.exercises[0]} />
+              <Button className="primary full" onClick={() => startWorkout(chosenSession)}>Start Workout</Button>
+            </div>
+            <div className="recent-section"><h3>Recent workouts</h3>
+              {[...store.workouts].reverse().slice(0,3).map((workout) => {
+                const session = sessions.find((s) => s.id === workout.sessionId) || sessions[0];
+                return <button key={workout.id} className="recent-workout" onClick={() => startWorkout(session)}><span className="program-letter">{workout.sessionId}</span><div><strong>{session.title}</strong><small>{workout.date} · {completedSetCount(workout)} sets · {workoutVolume(workout).toLocaleString()} kg</small></div><span>›</span></button>;
+              })}
+            </div>
+          </>
+        ) : null}
 
-      {previewSession ? (
-        <div className="modal-backdrop routine-backdrop" onClick={() => setPreviewSessionId(null)}>
-          <div className="routine-sheet" onClick={(event) => event.stopPropagation()}>
-            <div className="sheet-handle" />
-            <div className="routine-sheet-head">
-              <div>
-                <span className={previewSession.required ? "routine-letter" : "routine-letter optional"}>{previewSession.id}</span>
-                <div>
-                  <h2>{previewSession.title}</h2>
-                  <p>{previewSession.duration} · {previewSession.exercises.length} exercises</p>
+        {tab === "progress" ? (
+          <>
+            <header className="simple-header"><h1>Progress</h1><button className="icon-button">⚙</button></header>
+            <div className="segmented"><button className={progressTab==="exercises"?"active":""} onClick={() => setProgressTab("exercises")}>Exercises</button><button className={progressTab==="weight"?"active":""} onClick={() => setProgressTab("weight")}>Weight</button><button className={progressTab==="body"?"active":""} onClick={() => setProgressTab("body")}>Body Metrics</button></div>
+            {progressTab === "exercises" ? (
+              <div className="progress-panel">
+                <select className="exercise-select" value={selectedProgressExercise} onChange={(e) => setSelectedProgressExercise(e.target.value)}>
+                  {progressData.map((p) => <option key={p.exerciseId} value={p.exerciseId}>{p.label}</option>)}
+                </select>
+                <div className="range-tabs"><button>1M</button><button className="active">3M</button><button>6M</button><button>1Y</button><button>All</button></div>
+                <div className="big-chart"><LineChart values={selectedProgress.values.slice(-12)} /></div>
+                <div className="metric-cards">
+                  <div><span>Latest</span><strong>{selectedProgress.latest ? selectedProgress.latest.toFixed(selectedProgress.metric === "e1rm" ? 1 : 0) : "—"}</strong><small>{selectedProgress.unit}</small></div>
+                  <div><span>Total volume</span><strong>{store.workouts.reduce((sum,w) => sum + workoutVolume(w),0).toLocaleString()}</strong><small>kg</small></div>
+                  <div><span>Sessions</span><strong>{store.workouts.length}</strong><small>all time</small></div>
                 </div>
-              </div>
-              <button onClick={() => setPreviewSessionId(null)}>✕</button>
-            </div>
-            <p className="sheet-subtitle">{previewSession.subtitle}</p>
-            <div className="sheet-exercises">
-              {previewSession.exercises.map((exercise) => (
-                <div className="sheet-exercise" key={exercise.id}>
-                  <button onClick={() => openDemo(exercise)}><ExerciseThumb exercise={exercise} /></button>
-                  <div>
-                    <strong>{exercise.name}</strong>
-                    <span>{exercise.target}</span>
-                    <small>{exercise.sets} sets · {exercise.reps} · {exercise.rir}</small>
-                  </div>
-                  <button className="demo-pill" onClick={() => openDemo(exercise)}>
-                    View motion
-                  </button>
+                <h3>Recent Sets</h3>
+                <div className="recent-sets">
+                  {[...store.workouts].reverse().filter((w) => w.sessionId === selectedProgress.sessionId).slice(0,4).map((w) => {
+                    const sets = (w.sets[selectedProgress.exerciseId] || []).filter((s) => s.done);
+                    const best = sets.reduce((best,s) => Number(s.weight)>Number(best?.weight||0)?s:best, sets[0]);
+                    return <div key={w.id}><span>{w.date}</span><strong>{best ? (best.weight || "—") + " kg × " + (best.reps || "—") : "—"}</strong></div>;
+                  })}
                 </div>
-              ))}
-            </div>
-            <Button className="sheet-start" onClick={() => startWorkout(previewSession)}>Start routine</Button>
-          </div>
-        </div>
-      ) : null}
-
-      {demoExercise ? (
-        <div className="modal-backdrop" onClick={() => setDemoExercise(null)}>
-          <div className="demo-modal" onClick={(event) => event.stopPropagation()}>
-            <div className="modal-head">
-              <div>
-                <strong>{demoExercise.name}</strong>
-                <span>{demoExercise.target}</span>
+                <div className="actual-volume-card"><h3>Completed volume this week</h3>{actualWeeklyVolume.map(([muscle,sets]) => <div key={muscle} className="volume-row"><span>{muscle}</span><div><i style={{width:Math.min(100,(sets/VOLUME_REFERENCE_SETS)*100)+"%"}} /></div><strong>{sets}</strong></div>)}</div>
               </div>
-              <button onClick={() => setDemoExercise(null)}>✕</button>
+            ) : null}
+            {progressTab === "weight" ? (
+              <div className="progress-panel">
+                <div className="body-chart-card"><span>7-day rolling average</span><strong>{latestWeightAverage ? latestWeightAverage.toFixed(1)+" kg" : "No data"}</strong><LineChart values={weightRollingValues.slice(-14)} /></div>
+                <MeasurementForm />
+              </div>
+            ) : null}
+            {progressTab === "body" ? (
+              <div className="progress-panel">
+                <div className="body-chart-card"><span>Waist</span><strong>{latestBody?.waist ? latestBody.waist+" cm" : "No data"}</strong><LineChart values={waistTrendValues.slice(-14)} /></div>
+                <MeasurementForm />
+              </div>
+            ) : null}
+          </>
+        ) : null}
+
+        {tab === "nutrition" ? (
+          <>
+            <header className="simple-header"><h1>Nutrition</h1><button className="icon-button">⚙</button></header>
+            <div className="segmented"><button className="active">Daily Log</button><button>Meal Ideas</button></div>
+            <div className="nutrition-date">‹ &nbsp; {new Date().toLocaleDateString("en-GB",{weekday:"short",day:"numeric",month:"short",year:"numeric"})} &nbsp; ›</div>
+            <div className="macro-summary">
+              <div className="calorie-ring"><div><strong>2 450</strong><span>/ 2 800 kcal</span></div></div>
+              <div className="macro-bars">
+                {[["Protein",180,200],["Carbs",260,300],["Fats",90,100]].map(([name,val,max]) => <div key={String(name)}><div><span>{name}</span><strong>{val} / {max} g</strong></div><i><b style={{width:(Number(val)/Number(max))*100+"%"}} /></i></div>)}
+              </div>
             </div>
-            <div className="animation-stage">
-              <ExerciseAnimation exercise={demoExercise} size="large" />
+            <div className="meal-heading"><h3>Meals</h3><button>＋ Add Meal</button></div>
+            <div className="meal-cards">
+              {[
+                ["Lunch","Egusi Soup + Chicken + Rice","720 kcal"],
+                ["Breakfast","Oats + Banana + Protein","520 kcal"],
+                ["Dinner","Grilled Chicken + Plantain + Vegetables","660 kcal"]
+              ].map(([title,meal,kcal]) => <div key={title} className="meal-card"><div className="meal-thumb">{title[0]}</div><div><strong>{title}</strong><span>{meal}</span><small>{kcal}</small></div><span>›</span></div>)}
             </div>
-            <div className="demo-info">
-              <span>Technique</span>
-              <p>{demoExercise.cue}</p>
-              <span>Why it is here</span>
-              <p>{demoExercise.why}</p>
-            </div>
-            <div className="guide-link static-guide">Built-in looping movement guide</div>
-          </div>
-        </div>
-      ) : null}
+            <div className="nutrition-ideas"><h3>Meal ideas</h3>{mealIdeas.slice(0,5).map((m) => <div key={m}>{m}</div>)}</div>
+          </>
+        ) : null}
+
+        {tab === "more" ? (
+          <>
+            <header className="simple-header"><button onClick={() => setTab("program")}>‹</button><h1>App Settings</h1><span /></header>
+            <section className="settings-section"><h3>Appearance</h3><div className="theme-grid">
+              {(["system","light","dark"] as ThemeMode[]).map((mode) => <button key={mode} className={theme===mode?"selected":""} onClick={() => setTheme(mode)}><span>{mode==="system"?"◐":mode==="light"?"☼":"☾"}</span><strong>{mode[0].toUpperCase()+mode.slice(1)}</strong></button>)}
+            </div></section>
+            <section className="settings-section"><h3>Units</h3><div className="unit-toggle"><button className="active">Metric (kg)</button><button>Imperial (lb)</button></div></section>
+            <section className="settings-section settings-list">
+              <div><span>Rest Timer Sound</span><button className={"switch "+(sound?"on":"")} onClick={() => setSound(!sound)}><i /></button></div>
+              <div><span>Vibration</span><button className={"switch "+(vibration?"on":"")} onClick={() => setVibration(!vibration)}><i /></button></div>
+              <details><summary>Equipment at My Gym</summary><div className="equipment-options">{allEquipment.map((item) => <button className={store.equipment.includes(item)?"selected":""} key={item} onClick={() => stampStore((current) => ({...current,equipment:current.equipment.includes(item)?current.equipment.filter((x)=>x!==item):[...current.equipment,item]}))}>{store.equipment.includes(item)?"✓ ":"＋ "}{item}</button>)}</div></details>
+              <details><summary>Data & Export</summary><div className="sync-card"><span className={"sync-status "+syncStatus}>{syncStatus}</span><p>Your recovery key protects the cloud copy.</p><code>{syncKey}</code><Button className="secondary" onClick={() => navigator.clipboard?.writeText(syncKey)}>Copy key</Button><input value={recoveryInput} onChange={(e) => setRecoveryInput(e.target.value)} placeholder="Paste recovery key"/><Button className="primary" onClick={useRecoveryKey}>Use & restore</Button></div></details>
+              <div><span>Notifications</span><span>›</span></div>
+              <div><span>Language</span><span>English ›</span></div>
+            </section>
+            <section className="settings-section"><h3>Training principles</h3>{principles.slice(0,4).map(([title,text]) => <div className="principle-mini" key={title}><strong>{title}</strong><span>{text}</span></div>)}</section>
+            <section className="settings-section"><h3>Evidence</h3>{science.slice(0,4).map((s) => <a className="evidence-mini" key={s.title} href={s.url} target="_blank" rel="noreferrer"><strong>{s.title}</strong><span>↗</span></a>)}</section>
+          </>
+        ) : null}
+
+        <nav className="bottom-nav">
+          {(["program","workout","progress","nutrition","more"] as MainTab[]).map((item) => <button className={tab===item?"active":""} key={item} onClick={() => setTab(item)}><NavIcon tab={item}/><span>{item[0].toUpperCase()+item.slice(1)}</span></button>)}
+        </nav>
+      </section>
+
+      {detailExercise ? <ExerciseDetailModal exercise={detailExercise} tab={detailTab} setTab={setDetailTab} onClose={() => setDetailExercise(null)} /> : null}
     </main>
+  );
+
+  function MeasurementForm() {
+    return (
+      <div className="measurement-form">
+        <div><label>Weight (kg)<input value={bodyWeight} onChange={(e) => setBodyWeight(e.target.value)} inputMode="decimal" /></label><label>Waist (cm)<input value={waist} onChange={(e) => setWaist(e.target.value)} inputMode="decimal" /></label></div>
+        <div><label>Shoulders<input value={shoulders} onChange={(e) => setShoulders(e.target.value)} inputMode="decimal" /></label><label>Arms<input value={arms} onChange={(e) => setArms(e.target.value)} inputMode="decimal" /></label><label>Thighs<input value={thighs} onChange={(e) => setThighs(e.target.value)} inputMode="decimal" /></label></div>
+        <Button className="primary full" onClick={saveBody}>Log measurements</Button>
+      </div>
+    );
+  }
+}
+
+function ExerciseDetailModal({
+  exercise,
+  tab,
+  setTab,
+  onClose
+}: {
+  exercise: Exercise;
+  tab: ExerciseDetailTab;
+  setTab: (tab: ExerciseDetailTab) => void;
+  onClose: () => void;
+}) {
+  const steps = exerciseSteps(exercise);
+  return (
+    <div className="modal-backdrop exercise-detail-backdrop" onClick={onClose}>
+      <div className="exercise-detail-modal" onClick={(e) => e.stopPropagation()}>
+        <header><button onClick={onClose}>‹</button><strong>{exercise.name}</strong><button className="icon-button">⚙</button></header>
+        <div className="segmented detail-tabs"><button className={tab==="animation"?"active":""} onClick={() => setTab("animation")}>Animation</button><button className={tab==="muscles"?"active":""} onClick={() => setTab("muscles")}>Muscles</button><button className={tab==="steps"?"active":""} onClick={() => setTab("steps")}>Steps</button></div>
+        {tab === "animation" ? (
+          <>
+            <div className="detail-animation"><ExerciseArt exercise={exercise}/><div className="fake-player"><button>▶</button><i><b /></i><span>0:00 / 0:10</span><button>1x</button></div></div>
+            <div className="view-toggle"><button>Front</button><button className="active">Side</button><button>Top</button></div>
+            <ol className="step-list">{steps.map((step,i) => <li key={step}><span>{i+1}</span>{step}</li>)}</ol>
+          </>
+        ) : null}
+        {tab === "muscles" ? (
+          <>
+            <MuscleMap exercise={exercise}/>
+            <div className="muscle-info"><span><i className="primary-dot"/>Primary</span><span><i className="secondary-dot"/>Secondary</span></div>
+            <h3>Muscles worked</h3><div className="muscle-chips"><span>{exercise.target} (Primary)</span><span>Stabilizers (Secondary)</span></div>
+            <h3>Equipment</h3><div className="equipment-chip">{exercise.equipment[0]}</div>
+            <h3>Alternatives</h3><div className="alternatives-grid">{exercise.alternatives.slice(0,3).map((alt) => <div key={alt}><ExerciseArt exercise={exercise} compact/><span>{alt}</span></div>)}</div>
+          </>
+        ) : null}
+        {tab === "steps" ? <ol className="step-list full-steps">{steps.map((step,i) => <li key={step}><span>{i+1}</span>{step}</li>)}</ol> : null}
+      </div>
+    </div>
   );
 }
