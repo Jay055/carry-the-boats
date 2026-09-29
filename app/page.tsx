@@ -25,12 +25,44 @@ type Workout = {
   completed: boolean;
   durationMin?: number;
 };
-type BodyEntry = { date: string; weight: number; waist?: number };
-type AppStore = { workouts: Workout[]; body: BodyEntry[]; equipment: Equipment[] };
+type BodyEntry = {
+  date: string;
+  weight: number;
+  waist?: number;
+  shoulders?: number;
+  arms?: number;
+  thighs?: number;
+};
+type AppStore = {
+  workouts: Workout[];
+  body: BodyEntry[];
+  equipment: Equipment[];
+  updatedAt: number;
+};
 type Tab = "workout" | "history" | "progress" | "program";
 
-const STORAGE_KEY = "carry-the-boats-v6";
-const LEGACY_KEYS = ["carry-the-boats-v5", "carry-the-boats-v4"];
+const STORAGE_KEY = "carry-the-boats-v7";
+const LEGACY_KEYS = ["carry-the-boats-v6", "carry-the-boats-v5", "carry-the-boats-v4"];
+const SYNC_KEY_STORAGE = "carry-the-boats-recovery-key-v1";
+const SYNC_ENDPOINT = "https://xzgxqylefceimcciwzmm.supabase.co/functions/v1/workout-sync";
+
+const DIRECT_VOLUME_GROUPS: Record<string, string[]> = {
+  incline: ["Upper chest"],
+  inclineC: ["Upper chest"],
+  pulldown: ["Lats"],
+  singlelat: ["Lats"],
+  row: ["Upper back"],
+  rowC: ["Upper back"],
+  "cable-lateral-raise": ["Lateral delts"],
+  "reverse-pec-deck": ["Rear delts"],
+  shrug: ["Upper traps"],
+  "leg-press": ["Quads"],
+  "leg-extension": ["Quads"],
+  "seated-leg-curl": ["Hamstrings"],
+  hip: ["Glutes"]
+};
+
+const VOLUME_REFERENCE_SETS = 10;
 
 function isoDate(date = new Date()) {
   const year = date.getFullYear();
@@ -114,10 +146,42 @@ function latestExerciseLogs(workouts: Workout[]) {
   for (const workout of [...workouts].reverse()) {
     if (!workout.completed) continue;
     for (const [exerciseId, sets] of Object.entries(workout.sets)) {
-      if (!result[exerciseId]) result[exerciseId] = sets;
+      const key = workout.sessionId + ":" + exerciseId;
+      if (!result[key]) result[key] = sets;
     }
   }
   return result;
+}
+
+function createRecoveryKey() {
+  const bytes = new Uint8Array(32);
+  crypto.getRandomValues(bytes);
+  let binary = "";
+  for (const byte of bytes) binary += String.fromCharCode(byte);
+  return btoa(binary).replaceAll("+", "-").replaceAll("/", "_").replaceAll("=", "");
+}
+
+function hasMeaningfulData(store: AppStore) {
+  return store.workouts.length > 0 || store.body.length > 0;
+}
+
+function epleyEstimate(weight: number, reps: number) {
+  if (weight <= 0 || reps <= 0 || reps > 12) return 0;
+  return weight * (1 + reps / 30);
+}
+
+function rollingWeightAverage(entries: BodyEntry[]) {
+  const sorted = [...entries].sort((a, b) => a.date.localeCompare(b.date));
+  return sorted.map((entry, index) => {
+    const end = new Date(entry.date + "T12:00:00");
+    const start = new Date(end);
+    start.setDate(start.getDate() - 6);
+    const window = sorted.slice(0, index + 1).filter((item) => {
+      const date = new Date(item.date + "T12:00:00");
+      return date >= start && date <= end;
+    });
+    return window.reduce((sum, item) => sum + item.weight, 0) / Math.max(1, window.length);
+  });
 }
 
 function progressionAdvice(exercise: Exercise, previous?: SetLog[]) {
@@ -287,7 +351,7 @@ function MiniChart({ values }: { values: number[] }) {
 
 export default function Home() {
   const [tab, setTab] = useState<Tab>("workout");
-  const [store, setStore] = useState<AppStore>({ workouts: [], body: [], equipment: defaultEquipment });
+  const [store, setStore] = useState<AppStore>({ workouts: [], body: [], equipment: defaultEquipment, updatedAt: 0 });
   const [ready, setReady] = useState(false);
   const [selected, setSelected] = useState<Session["id"]>("A");
   const [previewSessionId, setPreviewSessionId] = useState<Session["id"] | null>(null);
@@ -299,6 +363,13 @@ export default function Home() {
   const [demoExercise, setDemoExercise] = useState<Exercise | null>(null);
   const [bodyWeight, setBodyWeight] = useState("");
   const [waist, setWaist] = useState("");
+  const [shoulders, setShoulders] = useState("");
+  const [arms, setArms] = useState("");
+  const [thighs, setThighs] = useState("");
+  const [syncKey, setSyncKey] = useState("");
+  const [recoveryInput, setRecoveryInput] = useState("");
+  const [syncReady, setSyncReady] = useState(false);
+  const [syncStatus, setSyncStatus] = useState<"local" | "checking" | "synced" | "error">("local");
 
   useEffect(() => {
     try {
@@ -315,13 +386,22 @@ export default function Home() {
         setStore({
           workouts: parsedWorkouts,
           body: parsed.body || [],
-          equipment: parsed.equipment && parsed.equipment.length ? parsed.equipment : defaultEquipment
+          equipment: parsed.equipment && parsed.equipment.length ? parsed.equipment : defaultEquipment,
+          updatedAt: parsed.updatedAt || (parsedWorkouts.length || parsed.body?.length ? Date.now() : 0)
         });
         const lastCore = [...parsedWorkouts].reverse().find((workout) => workout.completed && workout.sessionId !== "D");
         if (lastCore && (lastCore.sessionId === "A" || lastCore.sessionId === "B" || lastCore.sessionId === "C")) {
           setSelected(nextCoreId(lastCore.sessionId));
         }
       }
+
+      let recoveryKey = localStorage.getItem(SYNC_KEY_STORAGE) || "";
+      if (!recoveryKey) {
+        recoveryKey = createRecoveryKey();
+        localStorage.setItem(SYNC_KEY_STORAGE, recoveryKey);
+      }
+      setSyncKey(recoveryKey);
+      setRecoveryInput(recoveryKey);
     } catch {}
     setReady(true);
   }, []);
@@ -329,6 +409,79 @@ export default function Home() {
   useEffect(() => {
     if (ready) localStorage.setItem(STORAGE_KEY, JSON.stringify(store));
   }, [ready, store]);
+
+  useEffect(() => {
+    if (!ready || !syncKey) return;
+    let cancelled = false;
+    setSyncReady(false);
+    setSyncStatus("checking");
+
+    async function initialiseCloud() {
+      try {
+        const response = await fetch(SYNC_ENDPOINT, {
+          method: "GET",
+          headers: { "x-recovery-key": syncKey }
+        });
+
+        if (cancelled) return;
+
+        if (response.ok) {
+          const remote = await response.json() as { payload?: Partial<AppStore>; updatedAt?: number };
+          const remoteUpdatedAt = Number(remote.updatedAt || 0);
+          if (remote.payload && remoteUpdatedAt > store.updatedAt) {
+            setStore({
+              workouts: remote.payload.workouts || [],
+              body: remote.payload.body || [],
+              equipment: remote.payload.equipment?.length ? remote.payload.equipment : defaultEquipment,
+              updatedAt: remoteUpdatedAt
+            });
+          } else if (store.updatedAt > 0 || hasMeaningfulData(store)) {
+            await fetch(SYNC_ENDPOINT, {
+              method: "PUT",
+              headers: { "Content-Type": "application/json", "x-recovery-key": syncKey },
+              body: JSON.stringify({ payload: store, updatedAt: store.updatedAt || Date.now() })
+            });
+          }
+        } else if (response.status === 404 && (store.updatedAt > 0 || hasMeaningfulData(store))) {
+          await fetch(SYNC_ENDPOINT, {
+            method: "PUT",
+            headers: { "Content-Type": "application/json", "x-recovery-key": syncKey },
+            body: JSON.stringify({ payload: store, updatedAt: store.updatedAt || Date.now() })
+          });
+        }
+
+        if (!cancelled) {
+          setSyncReady(true);
+          setSyncStatus("synced");
+        }
+      } catch {
+        if (!cancelled) setSyncStatus("error");
+      }
+    }
+
+    initialiseCloud();
+    return () => { cancelled = true; };
+    // Deliberately re-run only when the recovery identity changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ready, syncKey]);
+
+  useEffect(() => {
+    if (!ready || !syncReady || !syncKey || store.updatedAt <= 0) return;
+    const id = window.setTimeout(async () => {
+      try {
+        setSyncStatus("checking");
+        const response = await fetch(SYNC_ENDPOINT, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json", "x-recovery-key": syncKey },
+          body: JSON.stringify({ payload: store, updatedAt: store.updatedAt })
+        });
+        setSyncStatus(response.ok ? "synced" : "error");
+      } catch {
+        setSyncStatus("error");
+      }
+    }, 900);
+    return () => window.clearTimeout(id);
+  }, [ready, syncReady, syncKey, store]);
 
   useEffect(() => {
     if (!active || !startedAt) return;
@@ -353,6 +506,12 @@ export default function Home() {
     completedThisWeek.filter((workout) => workout.sessionId !== "D").map((workout) => workout.sessionId)
   ).size;
   const latestBody = store.body.length ? store.body[store.body.length - 1] : undefined;
+  const weightRollingValues = useMemo(() => rollingWeightAverage(store.body), [store.body]);
+  const latestWeightAverage = weightRollingValues.at(-1);
+  const waistTrendValues = useMemo(
+    () => store.body.filter((entry) => typeof entry.waist === "number").map((entry) => Number(entry.waist)),
+    [store.body]
+  );
   const totalSets = active ? completedSetCount(active) : 0;
   const totalVolume = active ? workoutVolume(active) : 0;
   const elapsedSeconds = active && startedAt ? Math.max(0, Math.floor((clock - startedAt) / 1000)) : 0;
@@ -379,24 +538,80 @@ export default function Home() {
   }, []);
 
   const progressSeries = useMemo(() => {
-    const ids = ["press", "leg-press", "pulldown", "cable-lateral-raise"];
-    const labels: Record<string, string> = {
-      press: "Shoulder press",
-      "leg-press": "Leg press",
-      pulldown: "Lat pulldown",
-      "cable-lateral-raise": "Lateral raise"
-    };
-    return ids.map((exerciseId) => {
-      const values: number[] = [];
-      for (const workout of store.workouts) {
-        if (!workout.completed) continue;
-        const best = (workout.sets[exerciseId] || [])
-          .filter((set) => set.done && Number(set.weight) > 0)
-          .reduce((max, set) => Math.max(max, Number(set.weight)), 0);
-        if (best > 0) values.push(best);
+    const configs = [
+      { exerciseId: "press", sessionId: "A" as const, label: "Shoulder press", metric: "e1rm" as const },
+      { exerciseId: "leg-press", sessionId: "B" as const, label: "Leg press", metric: "e1rm" as const },
+      { exerciseId: "pulldown", sessionId: "A" as const, label: "Lat pulldown", metric: "e1rm" as const },
+      { exerciseId: "cable-lateral-raise", sessionId: "A" as const, label: "Lateral raise", metric: "fixed-reps" as const }
+    ];
+
+    return configs.map((config) => {
+      const relevant = store.workouts.filter((workout) => workout.completed && workout.sessionId === config.sessionId);
+      if (config.metric === "e1rm") {
+        const values = relevant.flatMap((workout) => {
+          const best = (workout.sets[config.exerciseId] || [])
+            .filter((set) => set.done)
+            .map((set) => epleyEstimate(Number(set.weight), Number(set.reps)))
+            .reduce((max, value) => Math.max(max, value), 0);
+          return best > 0 ? [best] : [];
+        }).slice(-8);
+
+        return {
+          ...config,
+          values,
+          metricLabel: "Estimated 1RM",
+          latestLabel: values.length ? values.at(-1)!.toFixed(1) + " kg e1RM" : "No data yet"
+        };
       }
-      return { exerciseId, label: labels[exerciseId], values: values.slice(-8) };
+
+      const latestWorkout = [...relevant].reverse().find((workout) =>
+        (workout.sets[config.exerciseId] || []).some((set) => set.done && Number(set.weight) > 0)
+      );
+      const referenceLoad = latestWorkout
+        ? Math.max(...(latestWorkout.sets[config.exerciseId] || []).filter((set) => set.done).map((set) => Number(set.weight) || 0))
+        : 0;
+
+      const values = referenceLoad > 0
+        ? relevant.flatMap((workout) => {
+            const reps = (workout.sets[config.exerciseId] || [])
+              .filter((set) => set.done && Math.abs(Number(set.weight) - referenceLoad) < 0.01)
+              .reduce((max, set) => Math.max(max, Number(set.reps) || 0), 0);
+            return reps > 0 ? [reps] : [];
+          }).slice(-8)
+        : [];
+
+      return {
+        ...config,
+        values,
+        metricLabel: referenceLoad ? "Reps at " + referenceLoad + " kg" : "Fixed-load reps",
+        latestLabel: values.length ? values.at(-1) + " reps @ " + referenceLoad + " kg" : "No data yet"
+      };
     });
+  }, [store.workouts]);
+
+  const actualWeeklyVolume = useMemo(() => {
+    const totals: Record<string, number> = {
+      "Upper chest": 0,
+      "Lats": 0,
+      "Upper back": 0,
+      "Lateral delts": 0,
+      "Rear delts": 0,
+      "Upper traps": 0,
+      "Quads": 0,
+      "Hamstrings": 0,
+      "Glutes": 0
+    };
+
+    for (const workout of store.workouts) {
+      if (!workout.completed || new Date(workout.date + "T12:00:00").getTime() < weekStart().getTime()) continue;
+      for (const [exerciseId, sets] of Object.entries(workout.sets)) {
+        const groups = DIRECT_VOLUME_GROUPS[exerciseId] || [];
+        const completed = sets.filter((set) => set.done).length;
+        for (const group of groups) totals[group] = (totals[group] || 0) + completed;
+      }
+    }
+
+    return Object.entries(totals);
   }, [store.workouts]);
 
   function startWorkout(session: Session) {
@@ -457,7 +672,8 @@ export default function Home() {
     const saved = { ...active, completed: true, durationMin: elapsed };
     setStore((current) => ({
       ...current,
-      workouts: [...current.workouts.filter((workout) => workout.id !== saved.id), saved]
+      workouts: [...current.workouts.filter((workout) => workout.id !== saved.id), saved],
+      updatedAt: Date.now()
     }));
     if (active.sessionId === "A" || active.sessionId === "B" || active.sessionId === "C") {
       setSelected(nextCoreId(active.sessionId));
@@ -477,14 +693,23 @@ export default function Home() {
     const value = Number(bodyWeight);
     if (!Number.isFinite(value) || value <= 0) return;
     const waistValue = Number(waist);
+    const shouldersValue = Number(shoulders);
+    const armsValue = Number(arms);
+    const thighsValue = Number(thighs);
     const entry: BodyEntry = {
       date: isoDate(),
       weight: value,
-      ...(Number.isFinite(waistValue) && waistValue > 0 ? { waist: waistValue } : {})
+      ...(Number.isFinite(waistValue) && waistValue > 0 ? { waist: waistValue } : {}),
+      ...(Number.isFinite(shouldersValue) && shouldersValue > 0 ? { shoulders: shouldersValue } : {}),
+      ...(Number.isFinite(armsValue) && armsValue > 0 ? { arms: armsValue } : {}),
+      ...(Number.isFinite(thighsValue) && thighsValue > 0 ? { thighs: thighsValue } : {})
     };
-    setStore((current) => ({ ...current, body: [...current.body, entry] }));
+    setStore((current) => ({ ...current, body: [...current.body, entry], updatedAt: Date.now() }));
     setBodyWeight("");
     setWaist("");
+    setShoulders("");
+    setArms("");
+    setThighs("");
   }
 
   function toggleEquipment(item: Equipment) {
@@ -494,7 +719,8 @@ export default function Home() {
         ...current,
         equipment: has
           ? current.equipment.filter((value) => value !== item)
-          : [...current.equipment, item]
+          : [...current.equipment, item],
+        updatedAt: Date.now()
       };
     });
   }
@@ -503,8 +729,26 @@ export default function Home() {
     if (!window.confirm("Delete this logged workout?")) return;
     setStore((current) => ({
       ...current,
-      workouts: current.workouts.filter((workout) => workout.id !== id)
+      workouts: current.workouts.filter((workout) => workout.id !== id),
+      updatedAt: Date.now()
     }));
+  }
+
+  function useRecoveryKey() {
+    const value = recoveryInput.trim();
+    if (!/^[A-Za-z0-9_-]{40,100}$/.test(value)) {
+      setSyncStatus("error");
+      return;
+    }
+    localStorage.setItem(SYNC_KEY_STORAGE, value);
+    setSyncReady(false);
+    setSyncKey(value);
+  }
+
+  async function copyRecoveryKey() {
+    try {
+      await navigator.clipboard.writeText(syncKey);
+    } catch {}
   }
 
   function openDemo(exercise: Exercise) {
@@ -561,7 +805,7 @@ export default function Home() {
 
         <section className="live-exercises">
           {activeSession.exercises.map((exercise) => {
-            const prev = previous[exercise.id];
+            const prev = previous[active.sessionId + ":" + exercise.id];
             const available = equipmentMatch(exercise, store.equipment);
             return (
               <article className="live-exercise" key={exercise.id}>
