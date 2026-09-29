@@ -104,7 +104,7 @@ export const sessions: Session[] = [
         why: "Lat growth adds upper-body width and balances the pressing work.",
         equipment: ["Lat pulldown", "Cable station"],
         alternatives: ["Assisted pull-up", "Single-arm cable pulldown", "Machine pullover"],
-        demoUrl: "https://musclewiki.com/exercises/lats/cables",
+        demoUrl: "https://musclewiki.com/exercise/neutral-pulldown",
         loadStep: 2.5, priority: true
       },
       {
@@ -116,7 +116,7 @@ export const sessions: Session[] = [
         why: "Stable rowing builds upper-back thickness with less lower-back fatigue.",
         equipment: ["Row machine", "Dumbbells", "Bench"],
         alternatives: ["Seated cable row", "Machine row", "Incline-bench dumbbell row"],
-        demoUrl: "https://musclewiki.com/exercises/upper-back/machine",
+        demoUrl: "https://musclewiki.com/exercise/machine-chest-supported-t-bar-row",
         loadStep: 2.5
       },
       {
@@ -141,7 +141,7 @@ export const sessions: Session[] = [
         why: "Rear-delt work adds shoulder roundness and helps balance pressing volume.",
         equipment: ["Pec deck / reverse pec deck"],
         alternatives: ["Cable reverse fly", "Chest-supported rear-delt fly", "Face pull"],
-        demoUrl: "https://musclewiki.com/exercises/rear-shoulders/machine",
+        demoUrl: "https://musclewiki.com/exercise/machine-reverse-fly",
         loadStep: 2.5, priority: true
       },
       {
@@ -153,7 +153,7 @@ export const sessions: Session[] = [
         why: "A modest trap dose can make the shoulder girdle look more substantial without stealing volume from the delts.",
         equipment: ["Dumbbells"],
         alternatives: ["Machine shrug", "Cable shrug"],
-        demoUrl: "https://musclewiki.com/exercises/traps/dumbbells",
+        demoUrl: "https://musclewiki.com/exercise/dumbbell-shrug",
         loadStep: 5
       }
     ]
@@ -244,7 +244,7 @@ export const sessions: Session[] = [
         why: "A second lat exposure distributes productive weekly volume.",
         equipment: ["Cable station"],
         alternatives: ["Lat pulldown", "Assisted pull-up", "Machine pullover"],
-        demoUrl: "https://musclewiki.com/exercises/lats/cables",
+        demoUrl: "https://musclewiki.com/exercise/neutral-pulldown",
         loadStep: 2.5, priority: true
       },
       {
@@ -269,7 +269,7 @@ export const sessions: Session[] = [
         why: "Adds back volume without another free-weight hinge.",
         equipment: ["Row machine", "Cable station"],
         alternatives: ["Chest-supported dumbbell row", "Machine row"],
-        demoUrl: "https://musclewiki.com/exercises/upper-back/cables",
+        demoUrl: "https://musclewiki.com/exercise/machine-seated-cable-row",
         loadStep: 2.5
       },
       {
@@ -294,7 +294,7 @@ export const sessions: Session[] = [
         why: "Second rear-delt exposure at a low systemic-fatigue cost.",
         equipment: ["Pec deck / reverse pec deck"],
         alternatives: ["Cable reverse fly", "Chest-supported rear-delt fly", "Face pull"],
-        demoUrl: "https://musclewiki.com/exercises/rear-shoulders/machine",
+        demoUrl: "https://musclewiki.com/exercise/machine-reverse-fly",
         loadStep: 2.5
       },
       {
@@ -351,7 +351,7 @@ export const sessions: Session[] = [
         why: "Extra rear-delt volume with little systemic fatigue.",
         equipment: ["Pec deck / reverse pec deck"],
         alternatives: ["Cable reverse fly", "Face pull"],
-        demoUrl: "https://musclewiki.com/exercises/rear-shoulders/machine",
+        demoUrl: "https://musclewiki.com/exercise/machine-reverse-fly",
         loadStep: 2.5
       },
       {
@@ -363,7 +363,7 @@ export const sessions: Session[] = [
         why: "Optional trap volume for a fuller shoulder-to-neck silhouette.",
         equipment: ["Dumbbells"],
         alternatives: ["Machine shrug", "Cable shrug"],
-        demoUrl: "https://musclewiki.com/exercises/traps/dumbbells",
+        demoUrl: "https://musclewiki.com/exercise/dumbbell-shrug",
         loadStep: 5
       },
       {
@@ -400,7 +400,7 @@ export const sessions: Session[] = [
         why: "A small direct arm dose after priority work.",
         equipment: ["Cable station"],
         alternatives: ["Dumbbell curl", "Machine curl"],
-        demoUrl: "https://musclewiki.com/exercises/biceps/cables",
+        demoUrl: "https://musclewiki.com/exercise/cable-bilateral-cross-cable-curl",
         loadStep: 1.25
       },
       {
@@ -412,7 +412,7 @@ export const sessions: Session[] = [
         why: "Efficient direct triceps work after the priority work.",
         equipment: ["Cable station"],
         alternatives: ["Machine dip", "Dumbbell overhead extension"],
-        demoUrl: "https://musclewiki.com/exercises/triceps/cables",
+        demoUrl: "https://musclewiki.com/exercise/cable-bar-pushdown",
         loadStep: 1.25
       }
     ]
