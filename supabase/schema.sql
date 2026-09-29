@@ -2,14 +2,14 @@ create extension if not exists "pgcrypto";
 
 create table if not exists profiles (
   id uuid primary key default gen_random_uuid(),
-  auth_user_id uuid unique,
+  auth_user_id uuid not null unique,
   display_name text,
   created_at timestamptz not null default now()
 );
 
 create table if not exists workouts (
   id uuid primary key default gen_random_uuid(),
-  profile_id uuid references profiles(id) on delete cascade,
+  profile_id uuid not null references profiles(id) on delete cascade,
   performed_on date not null,
   session_id text not null check (session_id in ('A','B','C','D')),
   duration_minutes integer,
@@ -33,7 +33,7 @@ create table if not exists workout_sets (
 
 create table if not exists body_metrics (
   id uuid primary key default gen_random_uuid(),
-  profile_id uuid references profiles(id) on delete cascade,
+  profile_id uuid not null references profiles(id) on delete cascade,
   measured_on date not null,
   weight_kg numeric(6,2) not null,
   waist_cm numeric(6,2),
@@ -42,7 +42,7 @@ create table if not exists body_metrics (
 
 create table if not exists equipment_preferences (
   id uuid primary key default gen_random_uuid(),
-  profile_id uuid references profiles(id) on delete cascade,
+  profile_id uuid not null references profiles(id) on delete cascade,
   equipment_name text not null,
   available boolean not null default true,
   unique(profile_id, equipment_name)
@@ -57,6 +57,12 @@ alter table workouts enable row level security;
 alter table workout_sets enable row level security;
 alter table body_metrics enable row level security;
 alter table equipment_preferences enable row level security;
+
+drop policy if exists "profiles own row" on profiles;
+drop policy if exists "workouts own rows" on workouts;
+drop policy if exists "sets own rows" on workout_sets;
+drop policy if exists "body metrics own rows" on body_metrics;
+drop policy if exists "equipment own rows" on equipment_preferences;
 
 create policy "profiles own row" on profiles
   for all using (auth.uid() = auth_user_id)
