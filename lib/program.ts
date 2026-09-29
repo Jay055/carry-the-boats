@@ -11,7 +11,16 @@ export type Equipment =
   | "Leg extension"
   | "Hip thrust / glute drive"
   | "Calf machine"
-  | "Bench";
+  | "Bench"
+  | "Hack squat"
+  | "Chest press machine"
+  | "Assisted pull-up"
+  | "Pullover machine"
+  | "Back extension machine"
+  | "Power rack / barbells"
+  | "EGYM"
+  | "TRX"
+  | "Treadmill / bike / rower";
 
 export type Exercise = {
   id: string;
@@ -58,6 +67,15 @@ export const allEquipment: Equipment[] = [
   "Hip thrust / glute drive",
   "Calf machine",
   "Bench",
+  "Hack squat",
+  "Chest press machine",
+  "Assisted pull-up",
+  "Pullover machine",
+  "Back extension machine",
+  "Power rack / barbells",
+  "EGYM",
+  "TRX",
+  "Treadmill / bike / rower",
 ];
 
 export const defaultEquipment = allEquipment;
@@ -173,7 +191,7 @@ export const sessions: Session[] = [
         cue: "Use a comfortable stance and pain-free depth; keep the pelvis controlled.",
         why: "A stable compound that loads the legs hard without making a heavy barbell squat mandatory.",
         equipment: ["Leg press"],
-        alternatives: ["Hack squat machine if comfortable", "Belt squat", "Supported split squat"],
+        alternatives: ["Hack squat machine if comfortable", "EGYM / alternate leg-press machine", "Leg extension + glute drive if pressing is uncomfortable"],
         demoUrl: mw("machine-leg-press"),
         videoUrl: "https://www.youtube.com/embed/RaI6ofF2geQ",
         loadStep: 5, priority: true
@@ -210,7 +228,7 @@ export const sessions: Session[] = [
         cue: "Use smooth reps in a comfortable range and never force joint pain.",
         why: "Adds quad volume efficiently without much whole-body fatigue.",
         equipment: ["Leg extension"],
-        alternatives: ["Belt squat", "Supported step-up", "Band leg extension"],
+        alternatives: ["EGYM leg press", "Hack squat in a comfortable range", "Band leg extension"],
         demoUrl: mw("machine-plate-loaded-leg-extension"),
         loadStep: 2.5
       },
@@ -374,7 +392,7 @@ export const sessions: Session[] = [
         cue: "Use pain-free depth and avoid grinding.",
         why: "Useful extra leg volume that is intentionally lighter than Session B.",
         equipment: ["Leg press"],
-        alternatives: ["Belt squat", "Supported split squat"],
+        alternatives: ["Hack squat in a comfortable range", "EGYM / alternate leg-press machine"],
         demoUrl: mw("machine-leg-press"),
         videoUrl: "https://www.youtube.com/embed/RaI6ofF2geQ",
         loadStep: 5
@@ -485,4 +503,15 @@ export const science = [
     text: "Concurrent endurance work does not automatically erase hypertrophy, but lower-body strength and recovery can be affected. Scheduling and fatigue management still matter.",
     url: "https://pubmed.ncbi.nlm.nih.gov/37847373/"
   }
+];
+
+
+export const exampleWeek = [
+  ["Mon", "Boxing"],
+  ["Tue", "Boxing"],
+  ["Wed", "Gym A — upper strength + width"],
+  ["Thu", "Boxing"],
+  ["Fri", "Gym B — joint-friendly lower"],
+  ["Sat", "Recovery; Session D only if genuinely fresh"],
+  ["Sun", "Gym C — hypertrophy + lower top-up"]
 ];
