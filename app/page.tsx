@@ -1325,10 +1325,35 @@ export default function Home() {
             </article>
 
             <article className="program-panel data-panel">
-              <h3>Data backup</h3>
-              <p className="panel-copy">Your workout log is stored in this browser for instant use. A secured Supabase backend is prepared for cross-device sync once the final production authentication redirect is configured.</p>
+              <div className="sync-title-row">
+                <div>
+                  <h3>Cloud backup</h3>
+                  <p className="panel-copy">Local logging stays instant, while a private Supabase snapshot protects you from browser-storage cleanup.</p>
+                </div>
+                <span className={"sync-status " + syncStatus}>
+                  {syncStatus === "synced" ? "Synced" : syncStatus === "checking" ? "Syncing…" : syncStatus === "error" ? "Sync issue" : "Local"}
+                </span>
+              </div>
+
+              <div className="recovery-key-card">
+                <span>Recovery key</span>
+                <code>{syncKey || "Generating…"}</code>
+                <p>Save this somewhere private. On a new device—or after Safari clears site data—enter it below to restore the cloud copy.</p>
+                <Button className="secondary-button" onClick={copyRecoveryKey}>Copy recovery key</Button>
+              </div>
+
+              <div className="restore-row">
+                <input
+                  value={recoveryInput}
+                  onChange={(event) => setRecoveryInput(event.target.value)}
+                  placeholder="Paste recovery key"
+                  aria-label="Recovery key"
+                />
+                <Button className="blue-button" onClick={useRecoveryKey}>Use & restore</Button>
+              </div>
+
               <Button
-                className="secondary-button"
+                className="secondary-button export-button"
                 onClick={() => {
                   const blob = new Blob([JSON.stringify(store, null, 2)], { type: "application/json" });
                   const url = URL.createObjectURL(blob);
@@ -1339,7 +1364,7 @@ export default function Home() {
                   URL.revokeObjectURL(url);
                 }}
               >
-                Export workout data
+                Export JSON backup
               </Button>
             </article>
           </section>
