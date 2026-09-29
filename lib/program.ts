@@ -37,7 +37,6 @@ export type Exercise = {
   equipment: Equipment[];
   alternatives: string[];
   demoUrl: string;
-  videoUrl?: string;
   loadStep: number;
   priority?: boolean;
 };
@@ -121,7 +120,6 @@ export const sessions: Session[] = [
         equipment: ["Dumbbells", "Bench", "Incline press machine"],
         alternatives: ["Incline machine press", "Low-incline dumbbell press", "Cable press"],
         demoUrl: mw("dumbbell-incline-bench-press"),
-        videoUrl: "https://www.youtube.com/embed/YzA3rsX3znQ",
         loadStep: 2.5
       },
       {
@@ -146,7 +144,6 @@ export const sessions: Session[] = [
         equipment: ["Row machine", "Dumbbells", "Bench"],
         alternatives: ["Seated cable row", "Machine row", "Incline-bench dumbbell row"],
         demoUrl: "https://musclewiki.com/exercise/machine-chest-supported-t-bar-row",
-        videoUrl: "https://www.youtube.com/embed/af-WbPlA_iY",
         loadStep: 2.5
       },
       {
@@ -159,7 +156,6 @@ export const sessions: Session[] = [
         equipment: ["Cable station"],
         alternatives: ["Lateral-raise machine", "Dumbbell lateral raise"],
         demoUrl: mw("cable-low-single-arm-lateral-raise"),
-        videoUrl: "https://www.youtube.com/embed/zR9xDUfHSqw",
         loadStep: 1.25, priority: true
       },
       {
@@ -184,7 +180,6 @@ export const sessions: Session[] = [
         equipment: ["Dumbbells"],
         alternatives: ["Machine shrug", "Cable shrug"],
         demoUrl: "https://musclewiki.com/exercise/dumbbell-shrug",
-        videoUrl: "https://www.youtube.com/embed/xiLT85G_GuU",
         loadStep: 5
       }
     ]
@@ -206,7 +201,6 @@ export const sessions: Session[] = [
         equipment: ["Leg press"],
         alternatives: ["Hack squat machine if comfortable", "EGYM / alternate leg-press machine", "Leg extension + glute drive if pressing is uncomfortable"],
         demoUrl: mw("machine-leg-press"),
-        videoUrl: "https://www.youtube.com/embed/RaI6ofF2geQ",
         loadStep: 5, priority: true
       },
       {
@@ -219,7 +213,6 @@ export const sessions: Session[] = [
         equipment: ["Seated leg curl"],
         alternatives: ["Lying leg curl", "Standing single-leg curl", "Controlled dumbbell RDL if comfortable"],
         demoUrl: mw("seated-leg-curl"),
-        videoUrl: "https://www.youtube.com/embed/G5iP_YcDQdE",
         loadStep: 2.5, priority: true
       },
       {
@@ -289,7 +282,6 @@ export const sessions: Session[] = [
         equipment: ["Incline press machine"],
         alternatives: ["Low-incline dumbbell press", "Cable press"],
         demoUrl: mw("dumbbell-incline-bench-press"),
-        videoUrl: "https://www.youtube.com/embed/YzA3rsX3znQ",
         loadStep: 2.5
       },
       {
@@ -314,7 +306,6 @@ export const sessions: Session[] = [
         equipment: ["Cable station"],
         alternatives: ["Lateral-raise machine", "Dumbbell lateral raise"],
         demoUrl: mw("cable-low-single-arm-lateral-raise"),
-        videoUrl: "https://www.youtube.com/embed/zR9xDUfHSqw",
         loadStep: 1.25, priority: true
       },
       {
@@ -351,7 +342,6 @@ export const sessions: Session[] = [
         equipment: ["Seated leg curl"],
         alternatives: ["Lying leg curl", "Standing single-leg curl"],
         demoUrl: mw("seated-leg-curl"),
-        videoUrl: "https://www.youtube.com/embed/G5iP_YcDQdE",
         loadStep: 2.5
       }
     ]
@@ -409,7 +399,6 @@ export const sessions: Session[] = [
         equipment: ["Leg press"],
         alternatives: ["Hack squat in a comfortable range", "EGYM / alternate leg-press machine"],
         demoUrl: mw("machine-leg-press"),
-        videoUrl: "https://www.youtube.com/embed/RaI6ofF2geQ",
         loadStep: 5
       },
       {
@@ -422,7 +411,6 @@ export const sessions: Session[] = [
         equipment: ["Seated leg curl"],
         alternatives: ["Lying leg curl", "Standing single-leg curl"],
         demoUrl: mw("seated-leg-curl"),
-        videoUrl: "https://www.youtube.com/embed/G5iP_YcDQdE",
         loadStep: 2.5
       },
       {
