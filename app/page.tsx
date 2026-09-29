@@ -158,11 +158,25 @@ export default function Home() {
       const raw = localStorage.getItem(STORAGE_KEY);
       if (raw) {
         const parsed = JSON.parse(raw) as Partial<AppStore>;
+        const parsedWorkouts = parsed.workouts || [];
         setStore({
-          workouts: parsed.workouts || [],
+          workouts: parsedWorkouts,
           body: parsed.body || [],
           equipment: parsed.equipment && parsed.equipment.length ? parsed.equipment : defaultEquipment
         });
+        const lastCore = [...parsedWorkouts]
+          .reverse()
+          .find((workout) => workout.completed && workout.sessionId !== "D");
+        if (lastCore) {
+          const nextCore: Record<"A" | "B" | "C", "A" | "B" | "C"> = {
+            A: "B",
+            B: "C",
+            C: "A"
+          };
+          if (lastCore.sessionId === "A" || lastCore.sessionId === "B" || lastCore.sessionId === "C") {
+            setSelected(nextCore[lastCore.sessionId]);
+          }
+        }
       }
     } catch {}
     setReady(true);
@@ -244,6 +258,9 @@ export default function Home() {
       ...current,
       workouts: [...current.workouts.filter((w) => w.id !== saved.id), saved]
     }));
+    if (active.sessionId === "A") setSelected("B");
+    if (active.sessionId === "B") setSelected("C");
+    if (active.sessionId === "C") setSelected("A");
     setActive(null);
     setStartedAt(null);
     setTimer(0);
@@ -540,6 +557,7 @@ export default function Home() {
                 <div>
                   <div className="eyebrow">TODAY</div>
                   <h2>Choose the next session</h2>
+                  <p>Recommended next: <strong>Session {selected}</strong>. The core rotation is A → B → C → repeat.</p>
                 </div>
               </div>
 
