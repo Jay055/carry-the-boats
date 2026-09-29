@@ -434,6 +434,8 @@ export const principles = [
   ["Stable exercise selection", "Do not rotate movements just for novelty. Repeating the same lifts makes progressive overload measurable."],
   ["Full, controlled ROM", "Use the largest comfortable range you can control. Pain-free technique outranks chasing a textbook depth."],
   ["Recoverable volume", "Session D is optional. Add it only when the previous sessions and your other training are being recovered from well."],
+  ["Frequency distributes work", "Muscle growth is driven more by productive weekly volume than by chasing a special split. The A/B/C rotation spreads that work across manageable sessions."],
+  ["Protect the lower-body session", "If you also box, run, or do hard conditioning, place Session B away from the hardest lower-body conditioning when practical so performance and recovery stay high."],
   ["No mandatory lift", "If an exercise aggravates a joint, replace it with a movement that trains the same target with less irritation."]
 ];
 
@@ -449,9 +451,14 @@ export const mealIdeas = [
 
 export const science = [
   {
-    title: "Weekly volume",
-    text: "Higher weekly set volume generally improves hypertrophy, but returns diminish. The baseline gives priority muscles enough direct work without making the optional day mandatory.",
+    title: "ACSM 2026 position stand",
+    text: "Progressive resistance training works across many implementations. Strength responds especially to heavier loading and hypertrophy to sufficient weekly volume; training to failure is not consistently required.",
     url: "https://pubmed.ncbi.nlm.nih.gov/41843416/"
+  },
+  {
+    title: "2026 volume dose-response",
+    text: "More productive weekly sets predict more hypertrophy and strength, but with diminishing returns. This is why the program starts moderate and makes Session D optional.",
+    url: "https://pubmed.ncbi.nlm.nih.gov/41343037/"
   },
   {
     title: "Proximity to failure",
@@ -464,8 +471,18 @@ export const science = [
     url: "https://pubmed.ncbi.nlm.nih.gov/39205815/"
   },
   {
-    title: "Load selection",
-    text: "Muscle can be built across a broad loading range; heavier work is useful for strength while moderate and higher reps can grow muscle with less joint loading.",
-    url: "https://pubmed.ncbi.nlm.nih.gov/35015560/"
+    title: "Long-length hamstring training",
+    text: "A controlled trial found greater whole-hamstring growth with seated versus prone leg curls, supporting the seated curl as our default when it is comfortable.",
+    url: "https://pubmed.ncbi.nlm.nih.gov/33009197/"
+  },
+  {
+    title: "Protein intake",
+    text: "A large meta-analysis found resistance-training gains rise with higher protein intake up to roughly 1.6 g/kg/day on average, with individual needs varying.",
+    url: "https://pubmed.ncbi.nlm.nih.gov/28698222/"
+  },
+  {
+    title: "Conditioning + lifting",
+    text: "Concurrent endurance work does not automatically erase hypertrophy, but lower-body strength and recovery can be affected. Scheduling and fatigue management still matter.",
+    url: "https://pubmed.ncbi.nlm.nih.gov/37847373/"
   }
 ];
