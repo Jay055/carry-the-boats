@@ -138,7 +138,7 @@ export const sessions: Session[] = [
         loadStep: 2.5
       },
       {
-        id: "latraiseA",
+        id: "cable-lateral-raise",
         name: "Cable Lateral Raise",
         sets: 4, reps: "10–20", minRep: 10, maxRep: 20, rir: "1 RIR", restSec: 90,
         target: "Lateral delts",
@@ -151,7 +151,7 @@ export const sessions: Session[] = [
         loadStep: 1.25, priority: true
       },
       {
-        id: "rearA",
+        id: "reverse-pec-deck",
         name: "Reverse Pec Deck",
         sets: 3, reps: "12–20", minRep: 12, maxRep: 20, rir: "1 RIR", restSec: 90,
         target: "Rear delts",
@@ -163,7 +163,7 @@ export const sessions: Session[] = [
         loadStep: 2.5, priority: true
       },
       {
-        id: "shrugA",
+        id: "shrug",
         name: "Machine or Dumbbell Shrug",
         sets: 2, reps: "8–15", minRep: 8, maxRep: 15, rir: "1–2 RIR", restSec: 90,
         target: "Upper traps",
@@ -184,7 +184,7 @@ export const sessions: Session[] = [
     duration: "55–70 min",
     exercises: [
       {
-        id: "legpress",
+        id: "leg-press",
         name: "Leg Press",
         sets: 3, reps: "6–10", minRep: 6, maxRep: 10, rir: "2 RIR", restSec: 180,
         target: "Quads + glutes",
@@ -197,7 +197,7 @@ export const sessions: Session[] = [
         loadStep: 5, priority: true
       },
       {
-        id: "curlB",
+        id: "seated-leg-curl",
         name: "Seated Leg Curl",
         sets: 3, reps: "8–12", minRep: 8, maxRep: 12, rir: "1–2 RIR", restSec: 120,
         target: "Hamstrings",
@@ -221,7 +221,7 @@ export const sessions: Session[] = [
         loadStep: 5
       },
       {
-        id: "extensionB",
+        id: "leg-extension",
         name: "Leg Extension",
         sets: 3, reps: "10–15", minRep: 10, maxRep: 15, rir: "1–2 RIR", restSec: 105,
         target: "Quads",
@@ -291,7 +291,7 @@ export const sessions: Session[] = [
         loadStep: 2.5
       },
       {
-        id: "latraiseC",
+        id: "cable-lateral-raise",
         name: "Cable Lateral Raise",
         sets: 4, reps: "12–20", minRep: 12, maxRep: 20, rir: "0–1 RIR final set", restSec: 90,
         target: "Lateral delts",
@@ -304,7 +304,7 @@ export const sessions: Session[] = [
         loadStep: 1.25, priority: true
       },
       {
-        id: "rearC",
+        id: "reverse-pec-deck",
         name: "Reverse Pec Deck",
         sets: 2, reps: "12–20", minRep: 12, maxRep: 20, rir: "1 RIR", restSec: 90,
         target: "Rear delts",
@@ -316,7 +316,7 @@ export const sessions: Session[] = [
         loadStep: 2.5
       },
       {
-        id: "extensionC",
+        id: "leg-extension",
         name: "Leg Extension",
         sets: 2, reps: "10–15", minRep: 10, maxRep: 15, rir: "1–2 RIR", restSec: 105,
         target: "Quads",
@@ -328,7 +328,7 @@ export const sessions: Session[] = [
         loadStep: 2.5
       },
       {
-        id: "curlC",
+        id: "seated-leg-curl",
         name: "Seated Leg Curl",
         sets: 2, reps: "10–15", minRep: 10, maxRep: 15, rir: "1–2 RIR", restSec: 105,
         target: "Hamstrings",
@@ -349,7 +349,7 @@ export const sessions: Session[] = [
     duration: "45–60 min",
     exercises: [
       {
-        id: "latraiseD",
+        id: "cable-lateral-raise",
         name: "Lateral-Raise Machine or Cable",
         sets: 3, reps: "12–20", minRep: 12, maxRep: 20, rir: "1 RIR", restSec: 90,
         target: "Lateral delts",
@@ -361,7 +361,7 @@ export const sessions: Session[] = [
         loadStep: 1.25, priority: true
       },
       {
-        id: "rearD",
+        id: "reverse-pec-deck",
         name: "Reverse Pec Deck",
         sets: 2, reps: "15–20", minRep: 15, maxRep: 20, rir: "1 RIR", restSec: 90,
         target: "Rear delts",
@@ -373,7 +373,7 @@ export const sessions: Session[] = [
         loadStep: 2.5
       },
       {
-        id: "shrugD",
+        id: "shrug",
         name: "Machine or Dumbbell Shrug",
         sets: 2, reps: "10–15", minRep: 10, maxRep: 15, rir: "1–2 RIR", restSec: 90,
         target: "Upper traps",
@@ -385,7 +385,7 @@ export const sessions: Session[] = [
         loadStep: 5
       },
       {
-        id: "legpressD",
+        id: "leg-press",
         name: "Light / Moderate Leg Press",
         sets: 2, reps: "10–15", minRep: 10, maxRep: 15, rir: "2 RIR", restSec: 120,
         target: "Quads + glutes",
@@ -398,7 +398,7 @@ export const sessions: Session[] = [
         loadStep: 5
       },
       {
-        id: "curlD",
+        id: "seated-leg-curl",
         name: "Seated Leg Curl",
         sets: 2, reps: "12–15", minRep: 12, maxRep: 15, rir: "1–2 RIR", restSec: 90,
         target: "Hamstrings",
