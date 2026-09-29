@@ -151,3 +151,10 @@ create table if not exists public.private_sync_state (
 
 alter table public.private_sync_state enable row level security;
 revoke all on public.private_sync_state from anon, authenticated;
+
+drop policy if exists "deny client access" on public.private_sync_state;
+create policy "deny client access" on public.private_sync_state
+  for all
+  to anon, authenticated
+  using (false)
+  with check (false);
