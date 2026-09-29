@@ -75,6 +75,8 @@ main { min-height: 100vh; }
 .timer span { font-size:.68rem; color:#4f5658; max-width:150px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 .timer strong { font-size:1.6rem; line-height:1; }
 .timer button { border:0; background:#dfe4da; color:#111; border-radius:10px; padding:8px; cursor:pointer; font-weight:800; }
+.warmup-note { margin:0 0 12px; border:1px solid var(--line); background:#0d1011; color:var(--muted); border-radius:16px; padding:14px 16px; line-height:1.55; font-size:.82rem; }
+.warmup-note strong { color:var(--text); }
 .optional-warning { margin:0 0 16px; border:1px solid rgba(215,255,53,.28); background:rgba(215,255,53,.055); color:#dce8a2; border-radius:16px; padding:14px 16px; line-height:1.55; font-size:.84rem; }
 .exercise-card { padding:24px; margin-bottom:16px; }
 .exercise-top { display:grid; grid-template-columns:42px 1fr auto; gap:14px; align-items:start; }
