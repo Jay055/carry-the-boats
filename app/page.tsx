@@ -414,6 +414,10 @@ export default function Home() {
               </Button>
             </div>
 
+            <div className="warmup-note">
+              <strong>Before working sets:</strong> use a short general warm-up, then 2–4 gradually heavier ramp-up sets for the first demanding exercise. Ramp-up sets should prepare you, not tire you out. <strong>RIR</strong> means the number of clean reps you estimate were still available.
+            </div>
+
             {active.sessionId === "D" ? (
               <div className="optional-warning">
                 <strong>Session D is earned volume.</strong> On a boxing-heavy week, keep this upper-body focused and skip the leg-press / leg-curl add-ons unless your legs are fully recovered and you are not compromising Session C.
