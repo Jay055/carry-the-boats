@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type ButtonHTMLAttributes } from "react";
 import {
   allEquipment,
   defaultEquipment,
@@ -104,7 +104,7 @@ function equipmentMatch(exercise: Exercise, available: Equipment[]) {
   return exercise.equipment.some((item) => available.includes(item));
 }
 
-function Button(props: React.ButtonHTMLAttributes<HTMLButtonElement>) {
+function Button(props: ButtonHTMLAttributes<HTMLButtonElement>) {
   const { children, className = "", ...rest } = props;
   return (
     <button className={"button " + className} {...rest}>
