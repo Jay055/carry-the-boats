@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState, type ButtonHTMLAttributes } from "react";
 import {
   allEquipment,
   defaultEquipment,
+  exampleWeek,
   mealIdeas,
   principles,
   science,
@@ -361,6 +362,12 @@ export default function Home() {
               </div>
               <Button className="ghost" onClick={() => setActive(null)}>Exit</Button>
             </div>
+
+            {active.sessionId === "D" ? (
+              <div className="optional-warning">
+                <strong>Session D is earned volume.</strong> On a boxing-heavy week, keep this upper-body focused and skip the leg-press / leg-curl add-ons unless your legs are fully recovered and you are not compromising Session C.
+              </div>
+            ) : null}
 
             {(sessions.find((s) => s.id === active.sessionId)?.exercises || []).map(
               (exercise, exerciseIndex) => {
@@ -757,6 +764,22 @@ export default function Home() {
                 </article>
               ))}
             </div>
+
+            <article className="panel weekly-layout">
+              <div>
+                <div className="eyebrow">EXAMPLE WEEK</div>
+                <h3>Three gym days around boxing</h3>
+                <p>This is a recovery-first template, not a rigid calendar. Keep Session B away from the hardest lower-body conditioning when you can.</p>
+              </div>
+              <div className="week-list">
+                {exampleWeek.map(([day, work]) => (
+                  <div key={day}>
+                    <strong>{day}</strong>
+                    <span>{work}</span>
+                  </div>
+                ))}
+              </div>
+            </article>
 
             <article className="panel nutrition">
               <div>
